@@ -134,17 +134,41 @@ export function getItemById(id: string): ItemDef | undefined {
 // Nightly item drops
 // ---------------------------------------------------------------------------
 
-const ZONES_FOR_DROPS = ['Beach', 'Villa', 'Garden', 'Jungle', 'Lookout', 'Challenge Arena', 'Dock'];
+/** Map display zone names → ZONE_POSITIONS keys */
+const ZONE_KEY_MAP: Record<string, string> = {
+  'Beach': 'beach',
+  'Villa': 'villa',
+  'Garden': 'garden',
+  'Challenge Arena': 'arena',
+  'Jungle': 'jungle',
+  'Dock': 'dock',
+  'Lookout': 'lookout',
+};
+
+/** Zones where items can drop — use open-area zones the player can easily walk to */
+const ZONES_FOR_DROPS = ['beach', 'garden', 'arena', 'dock', 'lookout'];
+
+const ISLAND_RADIUS = 19;
 
 export interface DroppedItem {
   item: ItemDef;
   position: [number, number, number];
 }
 
+/** Ensure a position is within the island circle and not too close to origin (villa). */
+function clampToPlayableArea(x: number, z: number): [number, number] {
+  const dist = Math.sqrt(x * x + z * z);
+  if (dist > ISLAND_RADIUS) {
+    const scale = ISLAND_RADIUS / dist;
+    x *= scale;
+    z *= scale;
+  }
+  return [x, z];
+}
+
 /**
  * Generate random item drops for the night.
- * Returns 2-4 items scattered across the island.
- * Journals bias toward their owner's preferred zone.
+ * Returns 2-4 items scattered across the island in open areas.
  */
 export function generateNightlyDrops(zonePositions: Record<string, [number, number, number]>): DroppedItem[] {
   const count = 2 + Math.floor(Math.random() * 3); // 2-4 items
@@ -156,7 +180,6 @@ export function generateNightlyDrops(zonePositions: Record<string, [number, numb
     let item: ItemDef | null = null;
 
     if (Math.random() < 0.3 && JOURNAL_DEFS.length > 0) {
-      // Pick a random journal
       const journal = JOURNAL_DEFS[Math.floor(Math.random() * JOURNAL_DEFS.length)];
       if (!usedIds.has(journal.id)) {
         item = journal;
@@ -164,8 +187,6 @@ export function generateNightlyDrops(zonePositions: Record<string, [number, numb
     }
 
     if (!item) {
-      // Pick from a random zone
-      const zone = ZONES_FOR_DROPS[Math.floor(Math.random() * ZONES_FOR_DROPS.length)];
       const candidates = ITEM_DEFS.filter(it => !usedIds.has(it.id) || it.rarity === 'common');
       if (candidates.length > 0) {
         item = candidates[Math.floor(Math.random() * candidates.length)];
@@ -175,21 +196,23 @@ export function generateNightlyDrops(zonePositions: Record<string, [number, numb
     if (!item) continue;
     usedIds.add(item.id);
 
-    // Place near the relevant zone
-    const spawnZone = item.spawnZones[0] ?? 'Beach';
-    const zoneKey = spawnZone.toLowerCase().replace(' ', '_');
-    // Try various zone key formats
-    const base = zonePositions[zoneKey]
-      ?? zonePositions[spawnZone.toLowerCase()]
-      ?? zonePositions['beach']
-      ?? [0, 0, 16];
+    // Pick a drop zone — prefer the item's spawn zone if it maps to a known key
+    const preferredZone = item.spawnZones[0];
+    const preferredKey = preferredZone ? ZONE_KEY_MAP[preferredZone] : undefined;
+    const dropZoneKey = preferredKey && zonePositions[preferredKey]
+      ? preferredKey
+      : ZONES_FOR_DROPS[Math.floor(Math.random() * ZONES_FOR_DROPS.length)];
 
-    const offsetX = (Math.random() - 0.5) * 6;
-    const offsetZ = (Math.random() - 0.5) * 6;
+    const base = zonePositions[dropZoneKey] ?? zonePositions['beach'] ?? [0, 0, 16];
+
+    // Offset from zone centre — keep modest so items land in the open
+    const offsetX = (Math.random() - 0.5) * 5;
+    const offsetZ = (Math.random() - 0.5) * 5;
+    const [cx, cz] = clampToPlayableArea(base[0] + offsetX, base[2] + offsetZ);
 
     drops.push({
       item,
-      position: [base[0] + offsetX, 0.3, base[2] + offsetZ],
+      position: [cx, 0.3, cz],
     });
   }
 

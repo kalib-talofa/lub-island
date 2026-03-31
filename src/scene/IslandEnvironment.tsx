@@ -29,13 +29,14 @@ function PalmTree({ position, scale = 1 }: { position: [number, number, number];
   return (
     <group position={position}>
       {/* Trunk - slightly tilted */}
-      <mesh position={[lean * 0.5, trunkHeight / 2, 0]} rotation={[0, 0, -0.12]}>
+      <mesh castShadow position={[lean * 0.5, trunkHeight / 2, 0]} rotation={[0, 0, -0.12]}>
         <cylinderGeometry args={[0.15 * scale, 0.25 * scale, trunkHeight, 8]} />
         <meshStandardMaterial color="#8B6914" roughness={0.9} />
       </mesh>
       {/* Canopy leaves - overlapping elongated spheres */}
       {[0, 1.2, 2.4, 3.6, 4.8].map((rot, i) => (
         <mesh
+          castShadow
           key={i}
           position={[lean * 0.5 + Math.cos(rot) * 0.6 * scale, trunkHeight + 0.2 * scale, Math.sin(rot) * 0.6 * scale]}
           rotation={[Math.sin(rot) * 0.5, rot, Math.cos(rot) * 0.4]}
@@ -57,15 +58,15 @@ function PalmTree({ position, scale = 1 }: { position: [number, number, number];
 function SimpleTree({ position, color = "#228B22" }: { position: [number, number, number]; color?: string }) {
   return (
     <group position={position}>
-      <mesh position={[0, 0.8, 0]}>
+      <mesh castShadow position={[0, 0.8, 0]}>
         <cylinderGeometry args={[0.12, 0.18, 1.6, 6]} />
         <meshStandardMaterial color="#6B4423" roughness={0.9} />
       </mesh>
-      <mesh position={[0, 2.0, 0]}>
+      <mesh castShadow position={[0, 2.0, 0]}>
         <coneGeometry args={[0.9, 1.8, 7]} />
         <meshStandardMaterial color={color} roughness={0.8} />
       </mesh>
-      <mesh position={[0, 2.8, 0]}>
+      <mesh castShadow position={[0, 2.8, 0]}>
         <coneGeometry args={[0.6, 1.2, 7]} />
         <meshStandardMaterial color={color} roughness={0.8} />
       </mesh>
@@ -91,7 +92,7 @@ function Beach({ isNight }: { isNight: boolean }) {
   return (
     <group position={[ZONE_POSITIONS.beach[0], ZONE_POSITIONS.beach[1], ZONE_POSITIONS.beach[2]]}>
       {/* Sand area */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]} scale={[18, 6, 1]}>
+      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]} scale={[18, 6, 1]}>
         <circleGeometry args={[1, 32]} />
         <meshStandardMaterial color={sandColor} roughness={1} />
       </mesh>
@@ -121,7 +122,7 @@ function Beach({ isNight }: { isNight: boolean }) {
             <cylinderGeometry args={[0.04, 0.04, 3, 6]} />
             <meshStandardMaterial color="#D2B48C" roughness={0.8} />
           </mesh>
-          <mesh position={[0, 2.8, 0]}>
+          <mesh castShadow position={[0, 2.8, 0]}>
             <coneGeometry args={[1.2, 0.6, 8]} />
             <meshStandardMaterial color={["#FF6347", "#FFD700", "#48D1CC"][i]} roughness={0.6} />
           </mesh>
@@ -173,38 +174,38 @@ function Villa({ isNight }: { isNight: boolean }) {
   return (
     <group position={[ZONE_POSITIONS.villa[0], ZONE_POSITIONS.villa[1], ZONE_POSITIONS.villa[2]]}>
       {/* Main hall */}
-      <mesh position={[0, 1.5, 0]}>
+      <mesh castShadow receiveShadow position={[0, 1.5, 0]}>
         <boxGeometry args={[6, 3, 5]} />
         <meshStandardMaterial color={wallColor} roughness={0.8} />
       </mesh>
       {/* Roof */}
-      <mesh position={[0, 3.3, 0]} rotation={[0, Math.PI / 4, 0]}>
+      <mesh castShadow position={[0, 3.3, 0]} rotation={[0, Math.PI / 4, 0]}>
         <coneGeometry args={[5, 1.6, 4]} />
         <meshStandardMaterial color={roofColor} roughness={0.85} />
       </mesh>
 
       {/* Left wing room */}
-      <mesh position={[-4.5, 1.0, 0]}>
+      <mesh castShadow receiveShadow position={[-4.5, 1.0, 0]}>
         <boxGeometry args={[3, 2, 3.5]} />
         <meshStandardMaterial color={wallColor} roughness={0.8} />
       </mesh>
-      <mesh position={[-4.5, 2.25, 0]} rotation={[0, 0, 0]}>
+      <mesh castShadow position={[-4.5, 2.25, 0]} rotation={[0, 0, 0]}>
         <coneGeometry args={[2.8, 1.0, 4]} />
         <meshStandardMaterial color={roofColor} roughness={0.85} />
       </mesh>
 
       {/* Right wing room */}
-      <mesh position={[4.5, 1.0, 0]}>
+      <mesh castShadow receiveShadow position={[4.5, 1.0, 0]}>
         <boxGeometry args={[3, 2, 3.5]} />
         <meshStandardMaterial color={wallColor} roughness={0.8} />
       </mesh>
-      <mesh position={[4.5, 2.25, 0]} rotation={[0, 0, 0]}>
+      <mesh castShadow position={[4.5, 2.25, 0]} rotation={[0, 0, 0]}>
         <coneGeometry args={[2.8, 1.0, 4]} />
         <meshStandardMaterial color={roofColor} roughness={0.85} />
       </mesh>
 
       {/* Porch / deck area (front) */}
-      <mesh position={[0, 0.08, 3.5]} rotation={[-Math.PI / 2, 0, 0]}>
+      <mesh receiveShadow position={[0, 0.08, 3.5]} rotation={[-Math.PI / 2, 0, 0]}>
         <boxGeometry args={[8, 3, 0.15]} />
         <meshStandardMaterial color="#B8860B" roughness={0.9} />
       </mesh>
@@ -247,7 +248,7 @@ function Garden({ isNight }: { isNight: boolean }) {
   return (
     <group position={[ZONE_POSITIONS.garden[0], ZONE_POSITIONS.garden[1], ZONE_POSITIONS.garden[2]]}>
       {/* Grassy patch */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]}>
+      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]}>
         <circleGeometry args={[6, 24]} />
         <meshStandardMaterial color={isNight ? "#1A5C1A" : "#2E8B2E"} roughness={1} />
       </mesh>
@@ -330,13 +331,13 @@ function ChallengeArena({ isNight }: { isNight: boolean }) {
   return (
     <group position={[ZONE_POSITIONS.arena[0], ZONE_POSITIONS.arena[1], ZONE_POSITIONS.arena[2]]}>
       {/* Arena floor */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]}>
+      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]}>
         <circleGeometry args={[7, 32]} />
         <meshStandardMaterial color={isNight ? "#8B7355" : "#C4A66A"} roughness={0.95} />
       </mesh>
 
       {/* Inner ring marking */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.03, 0]}>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.06, 0]}>
         <torusGeometry args={[4.5, 0.12, 4, 32]} />
         <meshStandardMaterial color="#FFFFFF" roughness={0.8} />
       </mesh>
@@ -352,7 +353,7 @@ function ChallengeArena({ isNight }: { isNight: boolean }) {
               <coneGeometry args={[0.3, 1.0, 6]} />
               <meshStandardMaterial color={markerColor} roughness={0.7} />
             </mesh>
-            <mesh position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+            <mesh position={[0, 0.05, 0]} rotation={[-Math.PI / 2, 0, 0]}>
               <circleGeometry args={[0.35, 8]} />
               <meshStandardMaterial color="#444444" roughness={0.9} />
             </mesh>
@@ -709,22 +710,22 @@ function IslandGround({ isNight }: { isNight: boolean }) {
   return (
     <group>
       {/* Main island - slightly irregular via overlapping ellipses */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]}>
+      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]}>
         <circleGeometry args={[20, 48]} />
         <meshStandardMaterial color={groundColor} roughness={0.95} />
       </mesh>
       {/* Slight extension north */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, -6]} scale={[14, 10, 1]}>
+      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, -6]} scale={[14, 10, 1]}>
         <circleGeometry args={[1, 32]} />
         <meshStandardMaterial color={groundColor} roughness={0.95} />
       </mesh>
       {/* Slight extension south-east for dock area */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[8, 0, 10]} scale={[10, 8, 1]}>
+      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[8, 0, 10]} scale={[10, 8, 1]}>
         <circleGeometry args={[1, 24]} />
         <meshStandardMaterial color={groundColor} roughness={0.95} />
       </mesh>
       {/* Slight extension south for beach */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 10]} scale={[15, 9, 1]}>
+      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 10]} scale={[15, 9, 1]}>
         <circleGeometry args={[1, 28]} />
         <meshStandardMaterial color={groundColor} roughness={0.95} />
       </mesh>

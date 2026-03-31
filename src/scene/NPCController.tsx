@@ -35,7 +35,7 @@ const NPC_ZONE_OFFSETS: Record<string, [number, number]> = {
   blaze:    [-1.5,  2.0], // Arena  — edge of the ring
   pudge:    [ 2.5,  1.5], // Villa  — porch area, outside the building
   kiki:     [-2.0,  1.0], // Beach  — next to a beach chair
-  sprocket: [ 2.0, -1.0], // Beach  — the other side
+  sprocket: [ 2.0,  0.5], // Beach  — in front of umbrella
   lily:     [ 1.5,  2.0], // Jungle — on the trail, clear of trees
 };
 
@@ -128,7 +128,7 @@ function NPCCharacter({ species, bodyColor }: NPCCharacterProps) {
   return (
     <group>
       {/* Body - cylinder */}
-      <mesh position={[0, 0.45, 0]}>
+      <mesh castShadow position={[0, 0.45, 0]}>
         <cylinderGeometry args={[0.25, 0.3, 0.6, 12]} />
         <meshStandardMaterial color={color} roughness={0.85} />
       </mesh>
@@ -142,7 +142,7 @@ function NPCCharacter({ species, bodyColor }: NPCCharacterProps) {
       )}
 
       {/* Head - sphere */}
-      <mesh position={[0, 0.95, 0]}>
+      <mesh castShadow position={[0, 0.95, 0]}>
         <sphereGeometry args={[0.25, 12, 10]} />
         <meshStandardMaterial
           color={species === "penguin" ? "#1A1A1A" : color}

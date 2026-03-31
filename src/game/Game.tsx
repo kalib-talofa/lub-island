@@ -161,6 +161,7 @@ export default function Game() {
     <div ref={viewportRef} className="game-viewport" style={{ position: 'relative' }}>
       {/* 3D Scene */}
       <Canvas
+        shadows
         orthographic
         camera={{ zoom: 60, near: 0.1, far: 1000, position: [20, 20, 20] }}
         style={{ position: 'absolute', inset: 0 }}

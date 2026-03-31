@@ -98,7 +98,26 @@ export default function DialogueBox({
   const hasGiftableItems = giftableItems.length > 0 && onGift;
 
   return (
-    <div className="pointer-events-auto fixed inset-x-0 bottom-0 z-50 flex flex-col">
+    <div className="pointer-events-auto fixed inset-x-0 bottom-0 z-50 flex flex-col px-3">
+      {/* Gift button — floating above the dialogue box */}
+      {hasGiftableItems && isComplete && displayedText === line.text && (
+        <div className="mb-2 flex justify-center">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowGiftPicker(!showGiftPicker);
+            }}
+            className={`flex items-center gap-2 rounded-2xl px-6 py-3 text-base font-bold shadow-lg transition active:scale-95 ${
+              showGiftPicker
+                ? "bg-pink-600 text-white"
+                : "bg-black/80 text-white backdrop-blur-sm hover:bg-black/90"
+            }`}
+          >
+            <span className="text-xl">{"\u{1F381}"}</span> Gift
+          </button>
+        </div>
+      )}
+
       <div
         className="flex min-h-[35vh] flex-col rounded-t-2xl bg-gradient-to-b from-gray-900/95 to-black/95 shadow-2xl backdrop-blur-md"
         onClick={handleTap}
@@ -115,36 +134,17 @@ export default function DialogueBox({
             {line.speaker}
           </span>
 
-          <div className="flex items-center gap-2">
-            {/* Gift button — always visible when player has giftable items */}
-            {hasGiftableItems && isComplete && displayedText === line.text && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowGiftPicker(!showGiftPicker);
-                }}
-                className={`flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold transition active:scale-95 ${
-                  showGiftPicker
-                    ? "bg-pink-600 text-white"
-                    : "bg-white/10 text-white/70 hover:bg-white/20"
-                }`}
-              >
-                {"\u{1F381}"} Gift
-              </button>
-            )}
-
-            {/* Close / leave conversation button */}
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onCancel();
-              }}
-              className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/10 text-sm text-white/60 transition hover:bg-white/20 hover:text-white active:scale-95"
-              title="Leave conversation"
-            >
-              {"\u2715"}
-            </button>
-          </div>
+          {/* Close / leave conversation button */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onCancel();
+            }}
+            className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/10 text-sm text-white/60 transition hover:bg-white/20 hover:text-white active:scale-95"
+            title="Leave conversation"
+          >
+            {"\u2715"}
+          </button>
         </div>
 
         {/* Gift picker dropdown */}

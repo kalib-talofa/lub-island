@@ -44,6 +44,11 @@ The dev toolbar is a `lil-gui` panel rendered by `src/dev/DevToolbar.tsx`. It oc
   - Advance to Ceremony
   - Reset Week
 - **Relationships** -- One slider per NPC (-100 to 100). Drag to directly set relationship values.
+- **Items** -- Contains subfolders and controls for inventory debugging:
+  - **Regular Items** subfolder: buttons to add each of the 5 regular items (Flowers, Chocolate, Book, Sunglasses, Producer's Phone).
+  - **Character Journals** subfolder: buttons to add each NPC's journal.
+  - **Clear Inventory** button to empty the bag.
+  - **Items in Bag** count display (auto-refreshes).
 
 ### WASD Keyboard Movement
 
@@ -280,7 +285,7 @@ function PalmTree({ position }: { position: [number, number, number] }) {
 - **Joystick vs keyboard listeners:** The virtual joystick writes directly to `joystickInputRef`. Synthetic `dispatchEvent` calls do NOT trigger the module-level `keydown` listeners in `PlayerController.tsx` -- only real user keyboard input works for WASD. The two input methods are independent.
 - **No save/load system.** All game state resets on page reload.
 - **Social events auto-complete.** Social events trigger NPC dialogue then immediately complete. They should have their own dedicated dialogue flow.
-- **Items are system-only.** No actual item models spawn in the 3D world. Items exist only in the inventory system.
+- **Nightly item drop positions are not structure-aware.** Nightly item drops may occasionally spawn inside structure colliders (buildings, fountains). Items are positioned with random offsets from zone centres and clamped to the island radius, but no structure collision check is performed on drop positions.
 - **Date dialogue coverage.** Date-specific dialogues only exist for Rosie and Kiki. Other NPCs fall back to regular chat scripts.
 - **Ceremony NPC logic.** The ceremony NPC decision doesn't account for existing NPC-to-NPC relationships when determining outcomes.
 - **Audio system is stubbed.** Howler is installed but no actual audio files are loaded. The audio system is placeholder only.
@@ -356,4 +361,6 @@ src/
 | `src/store/biometricStore.ts`     | Biometric data and derived stats                 |
 | `src/store/gameStore.ts`          | Game phase, day counter, events                  |
 | `src/dev/DevToolbar.tsx`          | lil-gui dev panel                                |
+| `src/scene/ItemPickups.tsx`       | 3D item pickup objects with glow and auto-collect |
+| `src/ui/InventoryUI.tsx`          | Unlimited bag inventory grid UI                  |
 | `src/ui/VirtualJoystick.tsx`      | Touch/mouse joystick input                       |

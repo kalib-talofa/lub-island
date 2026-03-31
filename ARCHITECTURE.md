@@ -53,6 +53,7 @@ src/
     IslandEnvironment.tsx       -- All static geometry (ground, water, zones, buildings, trees, props). Exports ZONE_POSITIONS.
     PlayerController.tsx        -- Player movement, collision, rendering. Exports module-level refs.
     NPCController.tsx           -- Renders all active NPCs with idle animation, facing, interaction proximity
+    ItemPickups.tsx               -- 3D item pickup objects (dodecahedron + glow + auto-collect)
     InteractionZone.tsx         -- (Unused / minimal -- interaction handled inside NPCController)
 
   store/
@@ -88,6 +89,7 @@ src/
     CeremonyUI.tsx              -- Partner choosing + elimination results
     SleepTransition.tsx         -- Night-to-morning fade
     ItemPopup.tsx               -- Generic popup (also used for "too tired" warning)
+    InventoryUI.tsx               -- Bag/inventory grid overlay (unlimited items, use/gift actions)
     ProducerPhone.tsx           -- Producer phone event picker
 
   utils/
@@ -181,7 +183,7 @@ interface BiometricStore {
 
 ```ts
 interface PlayerStore {
-  inventory: ItemDef[];            // max MAX_INVENTORY (3)
+  inventory: ItemDef[];            // unlimited (no cap)
   totalChallengesWon: number;
   totalDatesCompleted: number;
   playerSpecies: string;           // default 'dog'
@@ -396,6 +398,7 @@ Eliminated NPCs are filtered out entirely.
 - When nearby: NPC faces player (lerp rotation toward player, t=0.1).
 - Interaction bubble ("!" in white sphere) shown when nearby, hidden otherwise (set via `bubbleRef.current.visible`).
 - Click handler on the NPC group checks distance before calling `onInteract(npcId)`.
+- NPC positions are exported via `npcPositionsRef` (module-level Record<string, [number,number,number]>) for cross-component distance checks (e.g., dialogue auto-cancel).
 
 ### Idle animation
 
@@ -500,8 +503,17 @@ interface GameLoopState {
   dateNPCId: string;
   dateNPCName: string;
   briefingEvents: string[];
+  droppedItems: DroppedItem[];    // items spawned in the 3D world
+  showInventory: boolean;         // inventory overlay visibility
 }
 ```
+
+### Additional callbacks
+
+- `cancelDialogue()` -- exits active dialogue (used by close button and walk-away proximity check)
+- `handleGiftItem(item)` -- gifts an item during dialogue, removing it and boosting relationship
+- `handleItemPickup(index)` -- collects a dropped item from the world
+- `handleUseItem(item)` -- uses an item from inventory (eat chocolate, read book, etc.)
 
 ### Phase transitions
 
@@ -602,6 +614,13 @@ CAMERA = {
 }
 ```
 
+### Camera angle slider
+```ts
+// Camera angle slider (module-level ref in IsometricCamera.tsx)
+cameraAngleRef = { current: 50 }  // 0-100 slider, default 50
+// Interpolates between LOW (high zoom, top-down), MID (balanced), HIGH (low zoom, side view)
+```
+
 ### Player
 ```ts
 PLAYER = {
@@ -655,7 +674,7 @@ CEREMONY = {
 ```ts
 DAYS_PER_WEEK = 7
 EVENTS_PER_DAY = 3
-MAX_INVENTORY = 3
+// MAX_INVENTORY removed -- inventory is now unlimited
 
 WEEKLY_SCHEDULE = ['arrival', 'free', 'challenge', 'date', 'drama', 'free', 'ceremony']
 ```
@@ -748,10 +767,13 @@ interface ItemDef {
   id: string;
   name: string;
   description: string;
-  effect: 'gift_relationship' | 'energy_restore' | 'charm_boost' | 'reveal_info' | 'producer_phone' | 'cosmetic';
+  effect: 'gift_relationship' | 'energy_restore' | 'charm_boost' | 'reveal_info' | 'producer_phone' | 'cosmetic' | 'performance_boost';
   effectValue: number;
   spawnZones: string[];
   rarity: 'common' | 'uncommon' | 'rare';
+  ownerNpcId?: string;
+  giftValue: number;
+  consumeOnUse: boolean;
 }
 
 interface BiometricData {
@@ -764,3 +786,12 @@ interface BiometricData {
   performance: number;
 }
 ```
+
+---
+
+## 15. Key Files
+
+| File | Purpose |
+|---|---|
+| `src/scene/ItemPickups.tsx`     | 3D item pickup objects with glow and auto-collect    |
+| `src/ui/InventoryUI.tsx`        | Bag inventory grid UI                                |

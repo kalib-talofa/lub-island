@@ -10,13 +10,13 @@ import { Stars } from "@react-three/drei";
 // ---------------------------------------------------------------------------
 
 // Daytime lighting
-const DAY_AMBIENT_INTENSITY = 0.6;
-const DAY_DIR_INTENSITY = 1.2;
+const DAY_AMBIENT_INTENSITY = 0.8;
+const DAY_DIR_INTENSITY = 1.5;
 const DAY_DIR_COLOR = new THREE.Color("#FFF5E0"); // warm sunlight
 const DAY_DIR_POSITION: [number, number, number] = [-10, 20, 5]; // upper-left
 const DAY_SKY_COLOR = new THREE.Color("#87CEEB"); // hemisphere sky
 const DAY_GROUND_COLOR = new THREE.Color("#4A8C3F"); // hemisphere ground
-const DAY_HEMI_INTENSITY = 0.5;
+const DAY_HEMI_INTENSITY = 0.6;
 
 // Nighttime lighting — brighter than before so gameplay is visible
 const NIGHT_AMBIENT_INTENSITY = 0.35;
@@ -148,14 +148,16 @@ export default function DayNightCycle({ isNight }: DayNightCycleProps) {
         intensity={DAY_DIR_INTENSITY}
         position={DAY_DIR_POSITION}
         castShadow
-        shadow-mapSize-width={1024}
-        shadow-mapSize-height={1024}
+        shadow-mapSize-width={2048}
+        shadow-mapSize-height={2048}
+        shadow-bias={-0.002}
+        shadow-normalBias={0.05}
         shadow-camera-near={0.5}
-        shadow-camera-far={50}
-        shadow-camera-left={-20}
-        shadow-camera-right={20}
-        shadow-camera-top={20}
-        shadow-camera-bottom={-20}
+        shadow-camera-far={60}
+        shadow-camera-left={-25}
+        shadow-camera-right={25}
+        shadow-camera-top={25}
+        shadow-camera-bottom={-25}
       />
 
       {/* Hemisphere fill */}

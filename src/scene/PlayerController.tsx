@@ -141,7 +141,7 @@ function collidesWithStructure(x: number, z: number, playerRadius: number): bool
 // Constants
 // ---------------------------------------------------------------------------
 
-const ISLAND_RADIUS = 18;
+const ISLAND_RADIUS = 20;
 const BOB_SPEED = 10;
 const BOB_AMPLITUDE = 0.06;
 /** Isometric camera Y rotation (45 deg) used to convert joystick → world */
@@ -274,13 +274,13 @@ function DogCharacter() {
   return (
     <group>
       {/* Body – cylinder */}
-      <mesh position={[0, 0.45, 0]}>
+      <mesh castShadow position={[0, 0.45, 0]}>
         <cylinderGeometry args={[0.25, 0.3, 0.6, 12]} />
         <meshStandardMaterial color={BODY_COLOR} roughness={0.85} />
       </mesh>
 
       {/* Head – sphere */}
-      <mesh position={[0, 0.95, 0]}>
+      <mesh castShadow position={[0, 0.95, 0]}>
         <sphereGeometry args={[0.25, 12, 10]} />
         <meshStandardMaterial color={BODY_COLOR} roughness={0.85} />
       </mesh>

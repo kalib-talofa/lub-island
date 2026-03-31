@@ -12,7 +12,7 @@
 
 **Genre:** Social simulation / Dating sim / Reality TV game
 
-**Target Experience:** A casual, narrative-driven game played daily in short sessions. The biometric hook encourages healthy habits -- better sleep means more energy, more steps means better physical performance in challenges. Each in-game week culminates in a dramatic recoupling ceremony where unpopular characters are eliminated.
+**Target Experience:** A casual, narrative-driven game where one full in-game week can be played per real-world day. The biometric hook encourages healthy habits -- better sleep means more energy, more steps means better physical performance in challenges. Each in-game week culminates in a dramatic recoupling ceremony where unpopular characters are eliminated. The next real-world day, the player can play another week.
 
 **Player Character:** A golden dog (species: `dog`, id: `player`) with balanced 50/50 personality traits across all axes. The player starts at the Villa zone.
 
@@ -358,6 +358,18 @@ The `DialogueRunner` is initialized with:
 
 Separate date-specific dialogue scripts exist in `DATE_DIALOGUES` (currently implemented for Rosie and Kiki). These are used during date events and contribute to a chemistry score.
 
+### Dialogue Cancellation
+
+Players can exit any conversation via:
+- **Close button (X):** A close button in the top-right of the dialogue header dismisses the conversation immediately.
+- **Walk away:** If the player moves beyond 2x the interaction radius (5 units) from the NPC during dialogue, the conversation auto-cancels. A proximity check runs every 200ms.
+
+Cancelling a dialogue does not apply any pending relationship changes from the current dialogue runner.
+
+### Journal-Unlocked Dialogue
+
+When the player has read an NPC's character journal, a `journal_unlocked` variable is set to 1 in the DialogueRunner for that NPC. Dialogue scripts can use this to gate special choices or branches, revealing deeper character insights.
+
 ---
 
 ## 10. Events
@@ -464,37 +476,42 @@ The recoupling ceremony is a special phase, not a standard event.
 
 ## 11. Item System
 
-**Inventory limit: 3 items** (`MAX_INVENTORY = 3`)
-**Pickup cost: 3 energy** (`PICK_UP_ITEM`)
+**Inventory: Unlimited bag** (no slot cap). Items are stored in the player store and displayed in a scrollable grid UI.
+**Pickup: Free** -- walking near a dropped item auto-collects it (proximity radius 1.8 units).
 
 ### All Items
 
-| Item | Effect | Value | Spawn Zones | Rarity | Weight |
+| Item | Use Actions | Gift Value | Spawn Zones | Rarity | Consumable |
 |---|---|---|---|---|---|
-| **Flowers** | `gift_relationship` | +15 relationship | Garden | Common | 6 |
-| **Chocolate** | `gift_relationship` | +10 relationship | Beach, Villa | Common | 6 |
-| **Book** | `charm_boost` | +15 charm | Lookout | Uncommon | 3 |
-| **Character Journal** | `reveal_info` | -- | Villa | Uncommon | 3 |
-| **Sunglasses** | `cosmetic` | -- | Beach | Uncommon | 3 |
-| **Producer's Phone** | `producer_phone` | -- | Jungle | Rare | 1 |
+| **Flowers** | Gift only | +15 | Garden | Common | Yes |
+| **Chocolate** | Eat (+25 energy) or Gift | +10 | Beach, Villa | Common | Yes |
+| **Book** | Read (+15 performance today) or Gift | +10 | Lookout | Uncommon | Yes |
+| **Sunglasses** | Wear (+10 performance today) or Gift | +5 | Beach | Uncommon | Yes |
+| **Character Journal** | Read (unlock special dialogue with owner NPC) | 0 | Owner's preferred zone | Uncommon | No (persists until end of day) |
+| **Producer's Phone** | Call producer (choose next day's headline event) | 0 | Jungle | Rare | Yes |
 
-### Rarity Spawn Weights
+### Gifting
 
-| Rarity | Weight | Relative Chance |
-|---|---|---|
-| Common | 6 | Highest |
-| Uncommon | 3 | Medium |
-| Rare | 1 | Lowest |
+A **Gift** button appears above the dialogue box when speaking with any NPC, visible only when the player has giftable items (items with giftValue > 0). Clicking it opens a gift picker showing available items with their gift values. Gifting an item removes it from inventory and boosts the relationship with that NPC by the item's `giftValue`.
 
-Item spawning uses weighted random selection within valid zones. The `getRandomSpawnItem(zone)` function filters items by zone, then picks one weighted by rarity.
+### Nightly Item Drops
+
+When the player transitions from daytime to nighttime (via "Rest" button), 2-4 items spawn around the island as glowing 3D pickups. Items appear as colored dodecahedrons with emissive glow, point lights, floating emoji labels, and ground ring indicators. Walking within 1.8 units auto-collects them.
+
+- 70% chance: random regular item (weighted by rarity)
+- 30% chance: a random character journal (spawns near the owner NPC's preferred zone)
+
+A nighttime HUD tooltip informs the player: "Items have appeared around the island! Explore or go to sleep."
+
+Uncollected items are cleared when the next day begins.
 
 ### Item Effects
 
-- **gift_relationship:** Can be given to an NPC to boost relationship by `effectValue`
-- **charm_boost:** Temporarily increases charm stat by `effectValue`
-- **reveal_info:** Reveals hidden information about an NPC
-- **producer_phone:** Opens the Producer's Phone UI, letting the player influence the next day's headline event (costs 20 energy)
-- **cosmetic:** Purely visual, no gameplay effect
+- **gift_relationship:** Boosts NPC relationship by `giftValue` when gifted during dialogue
+- **energy_restore:** Restores energy when used from inventory (chocolate: +25)
+- **performance_boost:** Adds a temporary performance bonus for the current day (book: +15, sunglasses: +10)
+- **reveal_info:** Character journals unlock a special dialogue choice when speaking with the journal's owner NPC
+- **producer_phone:** Opens the Producer's Phone UI to choose tomorrow's headline event
 
 ---
 
@@ -558,11 +575,13 @@ The game uses an isometric-style camera:
 | Parameter | Value | Description |
 |---|---|---|
 | Rotation Y | 45 degrees (`PI/4`) | Horizontal rotation |
-| Tilt X | ~33 degrees (`PI/5.5`) | Downward tilt |
-| Zoom | 60 | Orthographic zoom level |
+| Tilt X | Variable (see slider) | Downward tilt, interpolated between LOW/MID/HIGH presets |
+| Zoom | 45-70 (interpolated) | Orthographic zoom, varies with camera angle |
 | Lerp Factor | 0.1 | Camera follow smoothing |
 | Near Plane | 0.1 | |
 | Far Plane | 1000 | |
+
+The camera angle is controlled by a 0-100 slider (`cameraAngleRef`), defaulting to 50. The slider interpolates between three offset presets (LOW, MID, HIGH) affecting both the camera position offset and zoom level. Pinch-to-zoom on touch devices maps to this same slider. The dev toolbar exposes the slider for testing.
 
 ---
 
@@ -582,20 +601,18 @@ The following features are referenced in the design or partially stubbed but not
 
 1. **New Arrivals (AI-Generated):** Day 1 "arrival" events exist in the weekly schedule, but new characters are not yet dynamically generated. The system supports an AI character generation route (`/api/ai/character`), but it does not produce new cast members during gameplay.
 
-2. **Producer Drama Events:** The Producer's Phone item and `handleProducerPhone` callback exist but only show a confirmation popup. Full producer-driven drama (rigging events, forcing dates, creating twists) is not implemented.
+2. **Producer Drama Events:** The Producer's Phone item and `handleProducerPhone` callback exist and the phone can be found in-world, but full producer-driven drama (rigging events, forcing dates, creating twists) is only partially working. Currently the phone shows a confirmation popup but does not fully alter the next day's schedule.
 
 3. **Player Bio Generation:** The player character has a basic backstory but there is no system for the player to customize their bio, personality, or appearance.
 
 4. **Real Audio:** No sound effects or music are implemented. The game is silent.
 
-5. **Proper Item Spawning in World:** Items are defined with spawn zones and rarity weights, but there is no 3D world representation of items on the ground. The item pickup system (`PICK_UP_ITEM` cost) is referenced but items do not visually appear in zones for the player to find.
+5. **Full 4-Week Season:** The weekly cycle repeats indefinitely. There is no concept of a season finale, winner declaration, or game-ending condition after a set number of weeks.
 
-6. **Full 4-Week Season:** The weekly cycle repeats indefinitely. There is no concept of a season finale, winner declaration, or game-ending condition after a set number of weeks.
+6. **Complete NPC Dialogue Coverage:** Date dialogues only exist for Rosie and Kiki (`DATE_DIALOGUES`). Blaze, Pudge, Sprocket, and Lily need date scripts.
 
-7. **Complete NPC Dialogue Coverage:** Date dialogues only exist for Rosie and Kiki (`DATE_DIALOGUES`). Blaze, Pudge, Sprocket, and Lily need date scripts.
+7. **NPC-to-NPC Relationships:** NPCs only have relationships with the player. There is no NPC-NPC relationship tracking, though the ceremony algorithm simulates NPC preferences via personality compatibility.
 
-8. **NPC-to-NPC Relationships:** NPCs only have relationships with the player. There is no NPC-NPC relationship tracking, though the ceremony algorithm simulates NPC preferences via personality compatibility.
+8. **Biometric Device Integration:** The biometric store accepts manual input. Actual device/health API integration (Apple Health, Google Fit, wearables) is not connected.
 
-9. **Biometric Device Integration:** The biometric store accepts manual input. Actual device/health API integration (Apple Health, Google Fit, wearables) is not connected.
-
-10. **Save/Load System:** No persistence layer. Game state resets on page refresh.
+9. **Save/Load System:** No persistence layer. Game state resets on page refresh.
