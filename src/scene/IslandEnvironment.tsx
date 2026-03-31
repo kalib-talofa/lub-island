@@ -103,7 +103,7 @@ function Rock({ position, scale = 1 }: { position: [number, number, number]; sca
 
 function Beach({ isNight }: { isNight: boolean }) {
   const sandColor = isNight ? "#A89060" : "#F4D68C";
-  const sandTexture = useOptionalTexture("/textures/sand.jpg", [6, 3]);
+  const sandTexture = useOptionalTexture("/textures/Sand.png", [6, 3]);
   return (
     <group position={[ZONE_POSITIONS.beach[0], ZONE_POSITIONS.beach[1], ZONE_POSITIONS.beach[2]]}>
       {/* Sand area */}
@@ -721,7 +721,7 @@ function WaterPlane({ isNight }: { isNight: boolean }) {
 
 function IslandGround({ isNight }: { isNight: boolean }) {
   const groundColor = isNight ? "#1E5C1E" : "#3CB043";
-  const grassTexture = useOptionalTexture("/textures/grass.jpg", [8, 8]);
+  const grassTexture = useOptionalTexture("/textures/Grass.png", [8, 8]);
 
   return (
     <group>

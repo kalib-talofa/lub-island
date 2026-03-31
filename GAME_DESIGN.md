@@ -57,7 +57,7 @@ The game follows a daily cycle that repeats within a 7-day week:
            +-------> Otherwise: MORNING_BRIEFING (next day)
 ```
 
-Each day generates up to **3 events** (`EVENTS_PER_DAY = 3`). Once all events are completed (or the player manually transitions), the game enters `NIGHTTIME_FREE`. Nighttime talk is free (0 energy). Sleeping advances to the next day.
+Each day generates up to **3 events** (`EVENTS_PER_DAY = 3`). Events are **required** -- the player must complete all events before progressing. The "Advance to Night" button only appears after all events are completed. Closing an event popup without starting it does not consume the event; it can be re-opened later. Once all events are completed, the game enters `NIGHTTIME_FREE`. Nighttime talk is free (0 energy). Sleeping advances to the next day.
 
 ---
 
@@ -80,7 +80,7 @@ There are **8 game phases** defined in `GamePhase`:
 - `MAIN_MENU` -> `MORNING_BRIEFING` (start game)
 - `MORNING_BRIEFING` -> `DAYTIME_FREE` (continue)
 - `DAYTIME_FREE` -> `EVENT` (trigger event) -> `DAYTIME_FREE` (event complete, events remaining > 0)
-- `DAYTIME_FREE` -> `NIGHTTIME_FREE` (all events done, or manual transition)
+- `DAYTIME_FREE` -> `NIGHTTIME_FREE` (all events completed)
 - `NIGHTTIME_FREE` -> `SLEEP_TRANSITION` (go to sleep)
 - `SLEEP_TRANSITION` -> `MORNING_BRIEFING` (next day, if day < 7)
 - `SLEEP_TRANSITION` -> `CEREMONY` (if day == 7)
@@ -337,7 +337,7 @@ Dialogue choices can be **charm-gated** using a `condition` function. The standa
 | 40-69 | Normal / friendly | Mid-tier flirty or clever options unlock |
 | 70+ | Smooth / charming | Top-tier responses unlock (highest relationship gains) |
 
-When a choice is locked, a `lockMessage` is displayed (e.g., "Needs 40 charm to land a counter-pun.").
+When a choice is locked, a `lockMessage` is displayed (e.g., "Needs 40 charm to land a counter-pun."). When a charm-gated choice is **unlocked** (the player meets the stat requirement), it is highlighted with a golden amber badge showing the stat threshold (e.g., "40 CHARM") and amber-tinted styling, indicating it is a special option earned by the player's stats.
 
 ### Relationship Effects on Choices
 
@@ -496,7 +496,7 @@ A **Gift** button appears above the dialogue box when speaking with any NPC, vis
 
 ### Nightly Item Drops
 
-When the player transitions from daytime to nighttime (via "Rest" button), 2-4 items spawn around the island as glowing 3D pickups. Items appear as colored dodecahedrons with emissive glow, point lights, floating emoji labels, and ground ring indicators. Walking within 1.8 units auto-collects them.
+When the player transitions from daytime to nighttime (after completing all events), 2-4 items spawn around the island as glowing 3D pickups. Items appear as colored dodecahedrons with emissive glow, point lights, floating emoji labels, and ground ring indicators. Walking within 1.8 units auto-collects them.
 
 - 70% chance: random regular item (weighted by rarity)
 - 30% chance: a random character journal (spawns near the owner NPC's preferred zone)

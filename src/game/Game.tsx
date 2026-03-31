@@ -192,7 +192,7 @@ export default function Game() {
           </div>
         )}
 
-        {/* Event trigger buttons - shown during daytime free roam */}
+        {/* Daily event checklist - shown during daytime free roam */}
         {gameStore.phase === 'DAYTIME_FREE' && !state.dialogueActive && (
           <div style={{
             pointerEvents: 'auto',
@@ -201,47 +201,137 @@ export default function Game() {
             right: '12px',
             display: 'flex',
             flexDirection: 'column',
-            gap: '8px',
+            gap: '6px',
+            width: '210px',
           }}>
-            {gameStore.eventsRemaining > 0 && state.dailyEvents.slice(0, gameStore.eventsRemaining).map((evt, i) => (
-              <button
-                key={evt.id}
-                onClick={() => triggerEvent(state.dailyEvents.length - gameStore.eventsRemaining + i)}
-                className="game-button"
-                style={{
-                  padding: '8px 12px',
-                  borderRadius: '12px',
-                  background: 'rgba(255,255,255,0.9)',
-                  border: '2px solid #f59e0b',
-                  fontSize: '12px',
-                  fontWeight: 'bold',
-                  cursor: 'pointer',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
-                }}
+            {/* Checklist header */}
+            <div className="flex items-center gap-1.5 px-1 pb-0.5">
+              <span className="text-xs">{"\u{1F4CB}"}</span>
+              <span className="text-[11px] font-bold uppercase tracking-wider text-white/70"
+                style={{ textShadow: '0 1px 4px rgba(0,0,0,0.6)' }}
               >
-                {evt.type === 'challenge' ? '\u2694\uFE0F' : evt.type === 'date' ? '\u{1F495}' : '\u{1F389}'} {evt.title}
-              </button>
-            ))}
+                Daily Events
+              </span>
+              <span className="ml-auto text-[10px] font-semibold text-white/50"
+                style={{ textShadow: '0 1px 4px rgba(0,0,0,0.6)' }}
+              >
+                {state.dailyEvents.length - gameStore.eventsRemaining}/{state.dailyEvents.length}
+              </span>
+            </div>
 
-            {/* Rest / Go to Night — only available after all events are done */}
-            {gameStore.eventsRemaining <= 0 && (
+            {/* Event buttons */}
+            {state.dailyEvents.map((evt, i) => {
+              const completedCount = state.dailyEvents.length - gameStore.eventsRemaining;
+              const isCompleted = i < completedCount;
+              const icon = evt.type === 'challenge' ? '\u2694\uFE0F' : evt.type === 'date' ? '\u{1F495}' : '\u{1F389}';
+
+              return (
+                <button
+                  key={evt.id}
+                  onClick={() => {
+                    if (!isCompleted) triggerEvent(i);
+                  }}
+                  disabled={isCompleted}
+                  className="game-button"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '8px 12px',
+                    borderRadius: '12px',
+                    background: isCompleted
+                      ? 'rgba(0,0,0,0.55)'
+                      : 'rgba(255,255,255,0.9)',
+                    border: isCompleted
+                      ? '2px solid rgba(34,197,94,0.5)'
+                      : '2px solid #f59e0b',
+                    fontSize: '12px',
+                    fontWeight: 'bold',
+                    cursor: isCompleted ? 'default' : 'pointer',
+                    textAlign: 'left',
+                    width: '100%',
+                    boxShadow: isCompleted
+                      ? 'none'
+                      : '0 2px 8px rgba(0,0,0,0.2)',
+                  }}
+                >
+                  {/* Checkmark / checkbox */}
+                  <span style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: '20px',
+                    height: '20px',
+                    borderRadius: '6px',
+                    border: isCompleted ? '2px solid #22c55e' : '2px solid #d1d5db',
+                    background: isCompleted ? '#22c55e' : 'white',
+                    flexShrink: 0,
+                    fontSize: '12px',
+                    color: 'white',
+                    fontWeight: 'bold',
+                  }}>
+                    {isCompleted ? '\u2713' : ''}
+                  </span>
+
+                  {/* Event label */}
+                  <span style={{
+                    color: isCompleted ? 'rgba(255,255,255,0.7)' : '#1f2937',
+                    textDecoration: isCompleted ? 'line-through' : 'none',
+                    flex: 1,
+                    lineHeight: '1.3',
+                  }}>
+                    {icon} {evt.title}
+                  </span>
+                </button>
+              );
+            })}
+
+            {/* Progress bar */}
+            <div style={{
+              height: '4px',
+              borderRadius: '2px',
+              background: 'rgba(255,255,255,0.15)',
+              overflow: 'hidden',
+              margin: '2px 0',
+            }}>
+              <div style={{
+                width: `${state.dailyEvents.length > 0 ? ((state.dailyEvents.length - gameStore.eventsRemaining) / state.dailyEvents.length) * 100 : 0}%`,
+                height: '100%',
+                borderRadius: '2px',
+                background: gameStore.eventsRemaining <= 0
+                  ? 'linear-gradient(90deg, #22c55e, #4ade80)'
+                  : 'linear-gradient(90deg, #f59e0b, #fbbf24)',
+                transition: 'width 0.4s ease',
+              }} />
+            </div>
+
+            {/* Advance to Night — only after all events done */}
+            {gameStore.eventsRemaining <= 0 ? (
               <button
                 onClick={goToSleep}
                 className="game-button"
                 style={{
-                  padding: '10px 20px',
-                  borderRadius: '16px',
+                  padding: '10px 16px',
+                  borderRadius: '12px',
                   background: 'linear-gradient(135deg, #4c1d95, #6d28d9)',
                   color: 'white',
                   border: '2px solid #8b5cf6',
-                  fontSize: '14px',
+                  fontSize: '13px',
                   fontWeight: 'bold',
                   cursor: 'pointer',
                   boxShadow: '0 2px 12px rgba(139,92,246,0.4)',
+                  width: '100%',
+                  textAlign: 'center',
                 }}
               >
                 {"\u{1F319}"} Advance to Night
               </button>
+            ) : (
+              <p className="text-center text-[11px] font-medium text-white/60"
+                style={{ textShadow: '0 1px 4px rgba(0,0,0,0.7)' }}
+              >
+                Complete all events to advance
+              </p>
             )}
           </div>
         )}

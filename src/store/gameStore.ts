@@ -36,11 +36,8 @@ export const useGameStore = create<GameStore>((set) => ({
   startEvent: (type) => set({ phase: 'EVENT', currentEventType: type }),
 
   completeEvent: () => set((s) => {
-    const eventsRemaining = s.eventsRemaining - 1;
+    const eventsRemaining = Math.max(0, s.eventsRemaining - 1);
     const eventsCompleted = s.eventsCompleted + 1;
-    if (eventsRemaining <= 0) {
-      return { eventsRemaining: 0, eventsCompleted, phase: 'NIGHTTIME_FREE', isNight: true, currentEventType: null };
-    }
     return { eventsRemaining, eventsCompleted, phase: 'DAYTIME_FREE', currentEventType: null };
   }),
 

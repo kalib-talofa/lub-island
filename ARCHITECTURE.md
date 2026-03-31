@@ -83,7 +83,7 @@ src/
     VirtualJoystick.tsx         -- Touch/mouse joystick; writes to joystickInputRef
     MainMenu.tsx                -- Start screen
     MorningBriefing.tsx         -- Day-start summary overlay
-    EventScreen.tsx             -- Event preview (title, description, energy cost, start/skip)
+    EventScreen.tsx             -- Event preview (title, description, energy cost, start/close)
     ChallengeUI.tsx             -- Coconut Catch mini-game
     DateUI.tsx                  -- Date sequence UI
     CeremonyUI.tsx              -- Partner choosing + elimination results
@@ -319,7 +319,7 @@ const worldZ = inputX * sin + inputY * cos;
 
 Two layers:
 
-1. **Island bounds**: circular boundary `ISLAND_RADIUS = 18` centered at origin. Uses `distSq < ISLAND_RADIUS^2`.
+1. **Island bounds**: circular boundary `ISLAND_RADIUS = 20` centered at origin. Uses `distSq < ISLAND_RADIUS^2`.
 
 2. **Structure colliders**: array of `CircleCollider { cx, cz, radius }`. Player collision radius: `PLAYER.COLLISION_RADIUS = 0.4`. Test: `dx*dx + dz*dz < (collider.radius + playerRadius)^2`.
 
@@ -454,7 +454,7 @@ class DialogueRunner {
 
 ### Charm-gating
 
-Choice conditions check `vars.charm >= N` (or other stats). If the condition fails, the choice is rendered with `locked: true` and `lockReason` text. The UI (DialogueBox) shows locked choices greyed out with the lock reason.
+Choice conditions check `vars.charm >= N` (or other stats). If the condition fails, the choice is rendered with `locked: true` and `lockReason` text. The UI (DialogueBox) shows locked choices greyed out with the lock reason. When a stat-gated choice is **unlocked**, it displays a golden amber badge (e.g., "40 CHARM") and amber-tinted styling to highlight it as a special option.
 
 ### Relationship change flow
 
@@ -526,7 +526,7 @@ MAIN_MENU
               challenge -> showChallengeUI -> handleChallengeComplete() -> DAYTIME_FREE (or NIGHTTIME_FREE if no events left)
               date -> showDateUI -> handleDateComplete() -> DAYTIME_FREE (or NIGHTTIME_FREE)
               social -> starts NPC dialogue -> completeEvent()
-           -> skipEvent() -> completeEvent()
+           -> closeEventScreen() -> dismisses popup without consuming event (player can re-open later)
         -> goToSleep() -> SLEEP_TRANSITION
      -> goToSleep() from NIGHTTIME_FREE -> SLEEP_TRANSITION
         -> continueSleep():
@@ -536,7 +536,7 @@ MAIN_MENU
            else -> advanceDay() -> MORNING_BRIEFING
 ```
 
-When `completeEvent()` is called on the game store, it decrements `eventsRemaining`. If it reaches 0, the store auto-transitions to `NIGHTTIME_FREE` and sets `isNight = true`.
+When `completeEvent()` is called on the game store, it decrements `eventsRemaining`. If it reaches 0, the store auto-transitions to `NIGHTTIME_FREE` and sets `isNight = true`. Events are required -- the "Advance to Night" button only appears after all events are completed. Closing the event popup (via `closeEventScreen()`) merely dismisses it without consuming the event.
 
 ### Movement locking
 
