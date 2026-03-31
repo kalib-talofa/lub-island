@@ -3,6 +3,7 @@
 import IsometricCamera from "@/scene/IsometricCamera";
 import DayNightCycle from "@/scene/DayNightCycle";
 import IslandEnvironment from "@/scene/IslandEnvironment";
+import VillaInterior from "@/scene/VillaInterior";
 import PlayerController from "@/scene/PlayerController";
 import NPCController from "@/scene/NPCController";
 import ItemPickups from "@/scene/ItemPickups";
@@ -22,6 +23,7 @@ interface IslandProps {
 export default function Island({ onNPCInteract, droppedItems = [], onItemPickup }: IslandProps) {
   const phase = useGameStore((s) => s.phase);
   const isNight = useGameStore((s) => s.isNight);
+  const isIndoors = useGameStore((s) => s.isIndoors);
 
   // Lock player movement during events, dialogue, ceremony, etc.
   const movementLocked = phase !== "DAYTIME_FREE" && phase !== "NIGHTTIME_FREE";
@@ -29,12 +31,24 @@ export default function Island({ onNPCInteract, droppedItems = [], onItemPickup 
   return (
     <>
       <IsometricCamera />
-      <DayNightCycle isNight={isNight} />
-      <IslandEnvironment isNight={isNight} />
-      <PlayerController position={[0, 0, 5]} isMovementLocked={movementLocked} />
-      <NPCController isNight={isNight} onNPCInteract={onNPCInteract} />
-      {droppedItems.length > 0 && onItemPickup && (
-        <ItemPickups drops={droppedItems} onPickup={onItemPickup} />
+
+      {isIndoors ? (
+        <>
+          {/* Villa interior scene */}
+          <VillaInterior isNight={isNight} />
+          <PlayerController position={[0, 0, 5.5]} isMovementLocked={movementLocked} isIndoors />
+        </>
+      ) : (
+        <>
+          {/* Outdoor island scene */}
+          <DayNightCycle isNight={isNight} />
+          <IslandEnvironment isNight={isNight} />
+          <PlayerController position={[0, 0, 6]} isMovementLocked={movementLocked} />
+          <NPCController isNight={isNight} onNPCInteract={onNPCInteract} />
+          {droppedItems.length > 0 && onItemPickup && (
+            <ItemPickups drops={droppedItems} onPickup={onItemPickup} />
+          )}
+        </>
       )}
     </>
   );

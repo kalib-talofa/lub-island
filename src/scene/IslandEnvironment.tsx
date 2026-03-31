@@ -3,7 +3,10 @@
 import { useRef, useMemo, Suspense } from "react";
 import * as THREE from "three";
 import { useFrame } from "@react-three/fiber";
-import { Instance, Instances, useTexture } from "@react-three/drei";
+import { Instance, Instances, useTexture, useGLTF } from "@react-three/drei";
+
+useGLTF.preload("/models/Environment/TropicalTree.glb");
+useGLTF.preload("/models/Environment/EvergreenTree.glb");
 
 // Wraps drei's useTexture and configures tiling/colorspace
 function useConfiguredTexture(path: string, repeat: [number, number]): THREE.Texture {
@@ -36,54 +39,29 @@ export const ZONE_POSITIONS: Record<string, [number, number, number]> = {
 // ---------------------------------------------------------------------------
 
 function PalmTree({ position, scale = 1 }: { position: [number, number, number]; scale?: number }) {
-  const trunkHeight = 3 * scale;
-  const lean = 0.4 * scale;
-  return (
-    <group position={position}>
-      {/* Trunk - slightly tilted */}
-      <mesh castShadow position={[lean * 0.5, trunkHeight / 2, 0]} rotation={[0, 0, -0.12]}>
-        <cylinderGeometry args={[0.15 * scale, 0.25 * scale, trunkHeight, 8]} />
-        <meshStandardMaterial color="#8B6914" roughness={0.9} />
-      </mesh>
-      {/* Canopy leaves - overlapping elongated spheres */}
-      {[0, 1.2, 2.4, 3.6, 4.8].map((rot, i) => (
-        <mesh
-          castShadow
-          key={i}
-          position={[lean * 0.5 + Math.cos(rot) * 0.6 * scale, trunkHeight + 0.2 * scale, Math.sin(rot) * 0.6 * scale]}
-          rotation={[Math.sin(rot) * 0.5, rot, Math.cos(rot) * 0.4]}
-          scale={[1.6 * scale, 0.35 * scale, 0.7 * scale]}
-        >
-          <sphereGeometry args={[0.7, 8, 6]} />
-          <meshStandardMaterial color="#2E8B22" roughness={0.85} />
-        </mesh>
-      ))}
-      {/* Top coconut cluster */}
-      <mesh position={[lean * 0.5, trunkHeight - 0.1, 0.15 * scale]}>
-        <sphereGeometry args={[0.18 * scale, 6, 6]} />
-        <meshStandardMaterial color="#5C4018" roughness={0.8} />
-      </mesh>
-    </group>
-  );
+  const { scene } = useGLTF("/models/Environment/TropicalTree.glb");
+  const clone = useMemo(() => {
+    const c = scene.clone();
+    c.traverse((child) => {
+      const mesh = child as THREE.Mesh;
+      if (mesh.isMesh) { mesh.castShadow = true; mesh.receiveShadow = true; }
+    });
+    return c;
+  }, [scene]);
+  return <primitive object={clone} position={position} scale={scale} />;
 }
 
-function SimpleTree({ position, color = "#228B22" }: { position: [number, number, number]; color?: string }) {
-  return (
-    <group position={position}>
-      <mesh castShadow position={[0, 0.8, 0]}>
-        <cylinderGeometry args={[0.12, 0.18, 1.6, 6]} />
-        <meshStandardMaterial color="#6B4423" roughness={0.9} />
-      </mesh>
-      <mesh castShadow position={[0, 2.0, 0]}>
-        <coneGeometry args={[0.9, 1.8, 7]} />
-        <meshStandardMaterial color={color} roughness={0.8} />
-      </mesh>
-      <mesh castShadow position={[0, 2.8, 0]}>
-        <coneGeometry args={[0.6, 1.2, 7]} />
-        <meshStandardMaterial color={color} roughness={0.8} />
-      </mesh>
-    </group>
-  );
+function SimpleTree({ position, scale = 1 }: { position: [number, number, number]; scale?: number }) {
+  const { scene } = useGLTF("/models/Environment/EvergreenTree.glb");
+  const clone = useMemo(() => {
+    const c = scene.clone();
+    c.traverse((child) => {
+      const mesh = child as THREE.Mesh;
+      if (mesh.isMesh) { mesh.castShadow = true; mesh.receiveShadow = true; }
+    });
+    return c;
+  }, [scene]);
+  return <primitive object={clone} position={position} scale={scale} />;
 }
 
 function Rock({ position, scale = 1 }: { position: [number, number, number]; scale?: number }) {
@@ -261,12 +239,15 @@ function Villa({ isNight }: { isNight: boolean }) {
 
 function Garden({ isNight }: { isNight: boolean }) {
   const flowerColors = ["#FF69B4", "#FF4500", "#FFD700", "#9370DB", "#FF6347", "#DA70D6"];
+  const grassTexture = useConfiguredTexture("/textures/Grass.png", [4, 4]);
+  const gravelTexture = useConfiguredTexture("/textures/GravelRock.png", [2, 2]);
+  const benchTexture = useConfiguredTexture("/textures/WoodPanelLong.png", [2, 1]);
   return (
     <group position={[ZONE_POSITIONS.garden[0], ZONE_POSITIONS.garden[1], ZONE_POSITIONS.garden[2]]}>
-      {/* Grassy patch */}
+      {/* Grassy patch — darker tint applied over grass texture */}
       <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]}>
         <circleGeometry args={[6, 24]} />
-        <meshStandardMaterial color={isNight ? "#1A5C1A" : "#2E8B2E"} roughness={1} />
+        <meshStandardMaterial color={isNight ? "#1A4A1A" : "#236B23"} map={grassTexture} roughness={1} />
       </mesh>
 
       {/* Fountain - central */}
@@ -274,7 +255,7 @@ function Garden({ isNight }: { isNight: boolean }) {
         {/* Base pool */}
         <mesh position={[0, 0.25, 0]}>
           <cylinderGeometry args={[1.5, 1.6, 0.5, 16]} />
-          <meshStandardMaterial color="#B0B0B0" roughness={0.6} />
+          <meshStandardMaterial color="#B0B0B0" map={gravelTexture} roughness={0.6} />
         </mesh>
         {/* Water in pool */}
         <mesh position={[0, 0.45, 0]}>
@@ -284,12 +265,12 @@ function Garden({ isNight }: { isNight: boolean }) {
         {/* Pedestal */}
         <mesh position={[0, 0.9, 0]}>
           <cylinderGeometry args={[0.25, 0.35, 1.0, 8]} />
-          <meshStandardMaterial color="#C0C0C0" roughness={0.5} />
+          <meshStandardMaterial color="#C0C0C0" map={gravelTexture} roughness={0.5} />
         </mesh>
         {/* Top bowl */}
         <mesh position={[0, 1.5, 0]}>
           <torusGeometry args={[0.5, 0.15, 8, 16]} />
-          <meshStandardMaterial color="#C0C0C0" roughness={0.5} />
+          <meshStandardMaterial color="#C0C0C0" map={gravelTexture} roughness={0.5} />
         </mesh>
       </group>
 
@@ -322,7 +303,7 @@ function Garden({ isNight }: { isNight: boolean }) {
         <group key={`bench-${i}`} position={pos} rotation={[0, (Math.PI / 2) * i, 0]}>
           <mesh position={[0, 0.35, 0]}>
             <boxGeometry args={[1.4, 0.08, 0.5]} />
-            <meshStandardMaterial color="#8B6914" roughness={0.85} />
+            <meshStandardMaterial color="#8B6914" map={benchTexture} roughness={0.85} />
           </mesh>
           {/* Legs */}
           {[[-0.55, 0.17, -0.18], [0.55, 0.17, -0.18], [-0.55, 0.17, 0.18], [0.55, 0.17, 0.18]].map((lp, li) => (
@@ -334,7 +315,7 @@ function Garden({ isNight }: { isNight: boolean }) {
           {/* Back rest */}
           <mesh position={[0, 0.6, -0.22]}>
             <boxGeometry args={[1.4, 0.5, 0.06]} />
-            <meshStandardMaterial color="#8B6914" roughness={0.85} />
+            <meshStandardMaterial color="#8B6914" map={benchTexture} roughness={0.85} />
           </mesh>
         </group>
       ))}
@@ -416,11 +397,7 @@ function JungleTrail({ isNight }: { isNight: boolean }) {
 
       {/* Dense trees */}
       {treePositions.map((pos, i) => (
-        <SimpleTree
-          key={`jtree-${i}`}
-          position={pos}
-          color={isNight ? "#1A5C1A" : ["#228B22", "#2E8B22", "#1E7A1E"][i % 3]}
-        />
+        <SimpleTree key={`jtree-${i}`} position={pos} />
       ))}
 
       {/* Bushes */}
@@ -774,30 +751,28 @@ export default function IslandEnvironment({ isNight }: IslandEnvironmentProps) {
         <IslandGround isNight={isNight} />
         <Beach isNight={isNight} />
         <Villa isNight={isNight} />
+        <Garden isNight={isNight} />
         <ChallengeArena isNight={isNight} />
         <Dock isNight={isNight} />
         <LookoutPoint isNight={isNight} />
-      </Suspense>
+        <JungleTrail isNight={isNight} />
 
-      {/* Non-textured zones */}
-      <Garden isNight={isNight} />
-      <JungleTrail isNight={isNight} />
+        {/* Extra palm trees scattered around the island */}
+        <PalmTree position={[-10, 0, 12]} scale={1.0} />
+        <PalmTree position={[6, 0, -6]} scale={0.85} />
+        <PalmTree position={[-14, 0, -4]} scale={1.1} />
+        <PalmTree position={[10, 0, -10]} scale={0.95} />
+
+        {/* Extra evergreen trees */}
+        <SimpleTree position={[-8, 0, 4]} />
+        <SimpleTree position={[8, 0, 5]} />
+        <SimpleTree position={[-5, 0, -4]} />
+        <SimpleTree position={[4, 0, -10]} />
+      </Suspense>
 
       {/* Scattered environment details */}
       <ScatteredRocks />
       <StringLights isNight={isNight} />
-
-      {/* Extra palm trees scattered around the island */}
-      <PalmTree position={[-10, 0, 12]} scale={1.0} />
-      <PalmTree position={[6, 0, -6]} scale={0.85} />
-      <PalmTree position={[-14, 0, -4]} scale={1.1} />
-      <PalmTree position={[10, 0, -10]} scale={0.95} />
-
-      {/* Extra simple trees */}
-      <SimpleTree position={[-8, 0, 4]} color="#2E8B2E" />
-      <SimpleTree position={[8, 0, 5]} color="#228B22" />
-      <SimpleTree position={[-5, 0, -4]} color="#1E7A1E" />
-      <SimpleTree position={[4, 0, -10]} color="#2E8B2E" />
 
       {/* Extra scattered rocks near water's edge */}
       <Rock position={[-16, 0.1, 10]} scale={0.7} />

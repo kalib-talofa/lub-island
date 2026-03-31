@@ -5,6 +5,8 @@ import * as THREE from "three";
 import { useFrame } from "@react-three/fiber";
 import { PLAYER } from "@/game/constants";
 import { ZONE_POSITIONS } from "@/scene/IslandEnvironment";
+import { VILLA_INTERIOR } from "@/scene/VillaInterior";
+import { useGameStore } from "@/store/gameStore";
 
 // ---------------------------------------------------------------------------
 // Module-level refs for cross-component communication
@@ -68,8 +70,13 @@ const zp = (zone: string, dx = 0, dz = 0): { cx: number; cz: number } => ({
 
 const STRUCTURE_COLLIDERS: CircleCollider[] = [
   // ---- Villa (centre) ----
-  // Main hall: box 6×5 → radius ~3.5 at centre
-  { ...zp("villa"), radius: 3.5 },
+  // Split the main hall into two side colliders with a gap for the front door
+  // Back half of villa (deeper into -Z)
+  { ...zp("villa", 0, -1.5), radius: 3.0 },
+  // Left side of front (blocks walking through left wall)
+  { ...zp("villa", -2.5, 1.5), radius: 1.8 },
+  // Right side of front (blocks walking through right wall)
+  { ...zp("villa", 2.5, 1.5), radius: 1.8 },
   // Left wing room at x=-4.5
   { ...zp("villa", -4.5, 0), radius: 2.0 },
   // Right wing room at x=+4.5
@@ -138,6 +145,63 @@ function collidesWithStructure(x: number, z: number, playerRadius: number): bool
 }
 
 // ---------------------------------------------------------------------------
+// Interior colliders (villa inside — couch, beds, tables)
+// ---------------------------------------------------------------------------
+
+const INTERIOR_COLLIDERS: CircleCollider[] = [
+  // Couch
+  { cx: 0, cz: -1, radius: 1.8 },
+  // Coffee table
+  { cx: 0, cz: 0.8, radius: 0.9 },
+  // Left wall beds (3 beds)
+  { cx: -7, cz: -3, radius: 1.2 },
+  { cx: -7, cz: 0, radius: 1.2 },
+  { cx: -7, cz: 3, radius: 1.2 },
+  // Right wall beds (3 beds)
+  { cx: 7, cz: -3, radius: 1.2 },
+  { cx: 7, cz: 0, radius: 1.2 },
+  { cx: 7, cz: 3, radius: 1.2 },
+];
+
+function collidesWithInterior(x: number, z: number, playerRadius: number): boolean {
+  for (const c of INTERIOR_COLLIDERS) {
+    const dx = x - c.cx;
+    const dz = z - c.cz;
+    const minDist = c.radius + playerRadius;
+    if (dx * dx + dz * dz < minDist * minDist) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/** Check if player is within the room bounds (walls) */
+function withinRoom(x: number, z: number, margin: number): boolean {
+  const halfW = VILLA_INTERIOR.ROOM_WIDTH / 2 - margin;
+  const halfD = VILLA_INTERIOR.ROOM_DEPTH / 2 - margin;
+  return x > -halfW && x < halfW && z > -halfD && z < halfD;
+}
+
+/** Check if player is at the door exit zone (front wall, within door opening) */
+function isAtDoorExit(x: number, z: number): boolean {
+  const doorHalf = VILLA_INTERIOR.DOOR_WIDTH / 2;
+  return x > -doorHalf && x < doorHalf && z > VILLA_INTERIOR.DOOR_Z - 1.0;
+}
+
+// Door trigger zone on the outdoor island (front of villa, tight to the door)
+const VILLA_DOOR_OUTDOOR = {
+  x: ZONE_POSITIONS.villa[0],     // 0
+  z: ZONE_POSITIONS.villa[2] + 2.5, // front face of villa, just before the door
+  radius: 0.8,
+};
+
+function isAtVillaDoorOutside(x: number, z: number): boolean {
+  const dx = x - VILLA_DOOR_OUTDOOR.x;
+  const dz = z - VILLA_DOOR_OUTDOOR.z;
+  return dx * dx + dz * dz < VILLA_DOOR_OUTDOOR.radius * VILLA_DOOR_OUTDOOR.radius;
+}
+
+// ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
@@ -154,16 +218,22 @@ const ISO_ANGLE = Math.PI / 4;
 interface PlayerControllerProps {
   position?: [number, number, number];
   isMovementLocked: boolean;
+  isIndoors?: boolean;
 }
 
 export default function PlayerController({
   position = [0, 0, 0],
   isMovementLocked,
+  isIndoors = false,
 }: PlayerControllerProps) {
   const groupRef = useRef<THREE.Group>(null);
   const bobPhase = useRef(0);
   const currentRotation = useRef(0);
   const isMoving = useRef(false);
+  const doorCooldown = useRef(0); // prevent rapid enter/exit
+
+  const enterVilla = useGameStore((s) => s.enterVilla);
+  const exitVilla = useGameStore((s) => s.exitVilla);
 
   // Initialise module-level refs once
   useMemo(() => {
@@ -174,6 +244,9 @@ export default function PlayerController({
   // ----- frame loop -------------------------------------------------------
   useFrame((_, delta) => {
     if (!groupRef.current) return;
+
+    // Door cooldown timer
+    if (doorCooldown.current > 0) doorCooldown.current -= delta;
 
     // Merge joystick + WASD input
     const joy = joystickInputRef.current;
@@ -195,24 +268,64 @@ export default function PlayerController({
       const nextX = playerPositionRef.current.x + worldX * speed;
       const nextZ = playerPositionRef.current.z + worldZ * speed;
 
-      // Island-bounds collision (circle around origin)
-      const distSq = nextX * nextX + nextZ * nextZ;
-      const withinIsland = distSq < ISLAND_RADIUS * ISLAND_RADIUS;
+      if (isIndoors) {
+        // ---- INDOOR movement (villa interior) ----
+        const inRoom = withinRoom(nextX, nextZ, PLAYER.COLLISION_RADIUS);
+        const hitsInterior = collidesWithInterior(nextX, nextZ, PLAYER.COLLISION_RADIUS);
 
-      // Structure collision
-      const hitsStructure = collidesWithStructure(nextX, nextZ, PLAYER.COLLISION_RADIUS);
+        if (inRoom && !hitsInterior) {
+          playerPositionRef.current.x = nextX;
+          playerPositionRef.current.z = nextZ;
+        } else if (inRoom) {
+          // Sliding
+          if (!collidesWithInterior(nextX, playerPositionRef.current.z, PLAYER.COLLISION_RADIUS)
+              && withinRoom(nextX, playerPositionRef.current.z, PLAYER.COLLISION_RADIUS)) {
+            playerPositionRef.current.x = nextX;
+          } else if (!collidesWithInterior(playerPositionRef.current.x, nextZ, PLAYER.COLLISION_RADIUS)
+              && withinRoom(playerPositionRef.current.x, nextZ, PLAYER.COLLISION_RADIUS)) {
+            playerPositionRef.current.z = nextZ;
+          }
+        }
 
-      if (withinIsland && !hitsStructure) {
-        playerPositionRef.current.x = nextX;
-        playerPositionRef.current.z = nextZ;
-      } else if (withinIsland) {
-        // Try sliding along one axis at a time
-        const slideX = playerPositionRef.current.x + worldX * speed;
-        const slideZ = playerPositionRef.current.z + worldZ * speed;
-        if (!collidesWithStructure(slideX, playerPositionRef.current.z, PLAYER.COLLISION_RADIUS)) {
-          playerPositionRef.current.x = slideX;
-        } else if (!collidesWithStructure(playerPositionRef.current.x, slideZ, PLAYER.COLLISION_RADIUS)) {
-          playerPositionRef.current.z = slideZ;
+        // Check for door exit
+        if (doorCooldown.current <= 0 && isAtDoorExit(playerPositionRef.current.x, playerPositionRef.current.z)) {
+          doorCooldown.current = 1.0;
+          // Teleport outside and exit
+          playerPositionRef.current.set(
+            VILLA_INTERIOR.EXIT_POSITION[0],
+            VILLA_INTERIOR.EXIT_POSITION[1],
+            VILLA_INTERIOR.EXIT_POSITION[2],
+          );
+          exitVilla();
+        }
+      } else {
+        // ---- OUTDOOR movement (island) ----
+        const distSq = nextX * nextX + nextZ * nextZ;
+        const withinIslandBounds = distSq < ISLAND_RADIUS * ISLAND_RADIUS;
+        const hitsStructure = collidesWithStructure(nextX, nextZ, PLAYER.COLLISION_RADIUS);
+
+        // Check for villa door entry — modify collision near front door
+        const nearVillaDoor = isAtVillaDoorOutside(nextX, nextZ);
+
+        if (nearVillaDoor && doorCooldown.current <= 0) {
+          doorCooldown.current = 1.0;
+          // Teleport inside and enter
+          playerPositionRef.current.set(
+            VILLA_INTERIOR.ENTRY_POSITION[0],
+            VILLA_INTERIOR.ENTRY_POSITION[1],
+            VILLA_INTERIOR.ENTRY_POSITION[2],
+          );
+          enterVilla();
+        } else if (withinIslandBounds && !hitsStructure) {
+          playerPositionRef.current.x = nextX;
+          playerPositionRef.current.z = nextZ;
+        } else if (withinIslandBounds) {
+          // Try sliding along one axis at a time
+          if (!collidesWithStructure(nextX, playerPositionRef.current.z, PLAYER.COLLISION_RADIUS)) {
+            playerPositionRef.current.x = nextX;
+          } else if (!collidesWithStructure(playerPositionRef.current.x, nextZ, PLAYER.COLLISION_RADIUS)) {
+            playerPositionRef.current.z = nextZ;
+          }
         }
       }
 
