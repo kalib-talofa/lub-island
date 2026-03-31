@@ -141,6 +141,7 @@ export default function DateUI({ npcId, npcName, onComplete }: DateUIProps) {
           line={currentLine}
           onChoice={handleChoice}
           onAdvance={advance}
+          onCancel={() => {}}
           speakerColor="#f472b6"
         />
       )}

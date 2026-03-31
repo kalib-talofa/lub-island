@@ -39,6 +39,11 @@ const NPC_ZONE_OFFSETS: Record<string, [number, number]> = {
   lily:     [ 1.5,  2.0], // Jungle — on the trail, clear of trees
 };
 
+/** Module-level ref: current NPC world positions (updated when placements change) */
+export const npcPositionsRef: { current: Record<string, [number, number, number]> } = {
+  current: {},
+};
+
 function getZonePosition(preferredZone: string, npcId?: string): [number, number, number] {
   const key = ZONE_KEY_MAP[preferredZone] ?? preferredZone.toLowerCase();
   const base = ZONE_POSITIONS[key] ?? [0, 0, 0];
@@ -429,6 +434,15 @@ export default function NPCController({ isNight, onNPCInteract }: NPCControllerP
       };
     });
   }, [isNight, eliminated]);
+
+  // Keep the module-level positions ref in sync
+  useMemo(() => {
+    const positions: Record<string, [number, number, number]> = {};
+    for (const npc of npcPlacements) {
+      if (npc.visible) positions[npc.id] = npc.position;
+    }
+    npcPositionsRef.current = positions;
+  }, [npcPlacements]);
 
   return (
     <>

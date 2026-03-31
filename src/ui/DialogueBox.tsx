@@ -20,6 +20,7 @@ interface DialogueBoxProps {
   line: DialogueLine;
   onChoice: (index: number) => void;
   onAdvance: () => void;
+  onCancel: () => void;
   speakerColor?: string;
   /** Items available for gifting (empty = no gift button) */
   giftableItems?: ItemDef[];
@@ -43,6 +44,7 @@ export default function DialogueBox({
   line,
   onChoice,
   onAdvance,
+  onCancel,
   speakerColor = "#f472b6",
   giftableItems = [],
   onGift,
@@ -113,22 +115,36 @@ export default function DialogueBox({
             {line.speaker}
           </span>
 
-          {/* Gift button — always visible when player has giftable items */}
-          {hasGiftableItems && isComplete && displayedText === line.text && (
+          <div className="flex items-center gap-2">
+            {/* Gift button — always visible when player has giftable items */}
+            {hasGiftableItems && isComplete && displayedText === line.text && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowGiftPicker(!showGiftPicker);
+                }}
+                className={`flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold transition active:scale-95 ${
+                  showGiftPicker
+                    ? "bg-pink-600 text-white"
+                    : "bg-white/10 text-white/70 hover:bg-white/20"
+                }`}
+              >
+                {"\u{1F381}"} Gift
+              </button>
+            )}
+
+            {/* Close / leave conversation button */}
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                setShowGiftPicker(!showGiftPicker);
+                onCancel();
               }}
-              className={`flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold transition active:scale-95 ${
-                showGiftPicker
-                  ? "bg-pink-600 text-white"
-                  : "bg-white/10 text-white/70 hover:bg-white/20"
-              }`}
+              className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/10 text-sm text-white/60 transition hover:bg-white/20 hover:text-white active:scale-95"
+              title="Leave conversation"
             >
-              {"\u{1F381}"} Gift
+              {"\u2715"}
             </button>
-          )}
+          </div>
         </div>
 
         {/* Gift picker dropdown */}

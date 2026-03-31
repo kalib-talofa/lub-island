@@ -342,6 +342,19 @@ export function useGameLoop() {
     setState(s => ({ ...s, currentLine: line }));
   }, [state.currentDialogue, state.currentNPCId, state.currentScriptId, relStore]);
 
+  // Cancel dialogue (close button or walked away)
+  const cancelDialogue = useCallback(() => {
+    if (!state.dialogueActive) return;
+    setState(s => ({
+      ...s,
+      dialogueActive: false,
+      currentDialogue: null,
+      currentLine: null,
+      currentNPCId: null,
+      currentScriptId: null,
+    }));
+  }, [state.dialogueActive]);
+
   // Dialogue advance (no choices, just tap to continue)
   const handleDialogueAdvance = useCallback(() => {
     if (!state.currentDialogue) return;
@@ -568,6 +581,7 @@ export function useGameLoop() {
     startGame,
     continueMorning,
     handleNPCInteract,
+    cancelDialogue,
     handleDialogueChoice,
     handleDialogueAdvance,
     triggerEvent,

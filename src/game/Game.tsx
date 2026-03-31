@@ -1,7 +1,7 @@
 'use client';
 
 import { Canvas } from '@react-three/fiber';
-import { Suspense, useEffect, useRef } from 'react';
+import { Suspense, useCallback, useEffect, useRef } from 'react';
 import Island from '@/scene/Island';
 import { useGameLoop } from './GameLoop';
 import { useGameStore } from '@/store/gameStore';
@@ -24,6 +24,9 @@ import ProducerPhone from '@/ui/ProducerPhone';
 import InventoryUI from '@/ui/InventoryUI';
 import { canAfford } from '@/systems/energy';
 import { cameraAngleRef } from '@/scene/IsometricCamera';
+import { playerPositionRef } from '@/scene/PlayerController';
+import { npcPositionsRef } from '@/scene/NPCController';
+import { PLAYER } from '@/game/constants';
 
 export default function Game() {
   const gameStore = useGameStore();
@@ -37,6 +40,7 @@ export default function Game() {
     startGame,
     continueMorning,
     handleNPCInteract,
+    cancelDialogue,
     handleDialogueChoice,
     handleDialogueAdvance,
     triggerEvent,
@@ -122,6 +126,32 @@ export default function Game() {
       el.removeEventListener('touchend', onTouchEnd);
       el.removeEventListener('touchcancel', onTouchEnd);
     };
+  }, []);
+
+  // ---------------------------------------------------------------------------
+  // Auto-cancel dialogue when player walks away from NPC
+  // ---------------------------------------------------------------------------
+  const cancelDialogueRef = useRef(cancelDialogue);
+  cancelDialogueRef.current = cancelDialogue;
+  const dialogueNpcIdRef = useRef(state.currentNPCId);
+  dialogueNpcIdRef.current = state.currentNPCId;
+  const dialogueActiveRef = useRef(state.dialogueActive);
+  dialogueActiveRef.current = state.dialogueActive;
+
+  useEffect(() => {
+    const LEAVE_RADIUS = PLAYER.INTERACTION_RADIUS * 2; // a bit more than interaction radius
+    const interval = setInterval(() => {
+      if (!dialogueActiveRef.current || !dialogueNpcIdRef.current) return;
+      const npcPos = npcPositionsRef.current[dialogueNpcIdRef.current];
+      if (!npcPos) return;
+      const dx = playerPositionRef.current.x - npcPos[0];
+      const dz = playerPositionRef.current.z - npcPos[2];
+      const dist = Math.sqrt(dx * dx + dz * dz);
+      if (dist > LEAVE_RADIUS) {
+        cancelDialogueRef.current();
+      }
+    }, 200);
+    return () => clearInterval(interval);
   }, []);
 
   // Get giftable items for dialogue
@@ -241,6 +271,7 @@ export default function Game() {
               line={state.currentLine}
               onChoice={handleDialogueChoice}
               onAdvance={handleDialogueAdvance}
+              onCancel={cancelDialogue}
               speakerColor={getNPCColor(state.currentNPCId)}
               giftableItems={giftableItems}
               onGift={handleGiftItem}
