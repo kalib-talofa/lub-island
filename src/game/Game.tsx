@@ -45,7 +45,7 @@ export default function Game() {
     handleDialogueAdvance,
     triggerEvent,
     handleStartEvent,
-    skipEvent,
+    closeEventScreen,
     handleChallengeComplete,
     handleDateComplete,
     goToSleep,
@@ -193,7 +193,7 @@ export default function Game() {
         )}
 
         {/* Event trigger buttons - shown during daytime free roam */}
-        {gameStore.phase === 'DAYTIME_FREE' && gameStore.eventsRemaining > 0 && !state.dialogueActive && (
+        {gameStore.phase === 'DAYTIME_FREE' && !state.dialogueActive && (
           <div style={{
             pointerEvents: 'auto',
             position: 'absolute',
@@ -203,7 +203,7 @@ export default function Game() {
             flexDirection: 'column',
             gap: '8px',
           }}>
-            {state.dailyEvents.slice(0, gameStore.eventsRemaining).map((evt, i) => (
+            {gameStore.eventsRemaining > 0 && state.dailyEvents.slice(0, gameStore.eventsRemaining).map((evt, i) => (
               <button
                 key={evt.id}
                 onClick={() => triggerEvent(state.dailyEvents.length - gameStore.eventsRemaining + i)}
@@ -223,22 +223,26 @@ export default function Game() {
               </button>
             ))}
 
-            {/* Rest / Go to Night button */}
-            <button
-              onClick={goToSleep}
-              className="game-button"
-              style={{
-                padding: '8px 12px',
-                borderRadius: '12px',
-                background: 'rgba(100,100,150,0.9)',
-                color: 'white',
-                border: 'none',
-                fontSize: '12px',
-                cursor: 'pointer',
-              }}
-            >
-              {"\u{1F634}"} Rest (skip remaining)
-            </button>
+            {/* Rest / Go to Night — only available after all events are done */}
+            {gameStore.eventsRemaining <= 0 && (
+              <button
+                onClick={goToSleep}
+                className="game-button"
+                style={{
+                  padding: '10px 20px',
+                  borderRadius: '16px',
+                  background: 'linear-gradient(135deg, #4c1d95, #6d28d9)',
+                  color: 'white',
+                  border: '2px solid #8b5cf6',
+                  fontSize: '14px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 12px rgba(139,92,246,0.4)',
+                }}
+              >
+                {"\u{1F319}"} Advance to Night
+              </button>
+            )}
           </div>
         )}
 
@@ -318,7 +322,7 @@ export default function Game() {
               eventDescription={state.currentEvent.description}
               energyCost={state.currentEvent.energyCost}
               onStart={() => handleStartEvent(state.currentEvent!)}
-              onSkip={skipEvent}
+              onClose={closeEventScreen}
               canAfford={canAfford(bio.energy, state.currentEvent.energyCost)}
             />
           </div>

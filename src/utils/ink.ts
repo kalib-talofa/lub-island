@@ -56,11 +56,23 @@ export class DialogueRunner {
 
     const choices: DialogueChoice[] = node.choices?.map((c, i) => {
       const meetsCondition = c.condition ? c.condition(this.variables) : true;
+      // Extract stat requirement from lockMessage (e.g. "Needs 40 charm ...")
+      let requiredStat: string | undefined;
+      let requiredValue: number | undefined;
+      if (c.lockMessage) {
+        const match = c.lockMessage.match(/Needs\s+(\d+)\s+(\w+)/i);
+        if (match) {
+          requiredValue = parseInt(match[1], 10);
+          requiredStat = match[2].toLowerCase();
+        }
+      }
       return {
         text: c.text,
         index: i,
         locked: !meetsCondition,
         lockReason: !meetsCondition ? c.lockMessage : undefined,
+        requiredStat: c.condition ? requiredStat : undefined,
+        requiredValue: c.condition ? requiredValue : undefined,
       };
     }) ?? [];
 

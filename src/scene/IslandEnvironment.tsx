@@ -1,9 +1,23 @@
 "use client";
 
-import { useRef, useMemo } from "react";
+import { useRef, useMemo, useState, useEffect } from "react";
 import * as THREE from "three";
 import { useFrame } from "@react-three/fiber";
 import { Instance, Instances } from "@react-three/drei";
+
+// Loads a texture without crashing if the file is missing
+function useOptionalTexture(path: string, repeat: [number, number]): THREE.Texture | null {
+  const [texture, setTexture] = useState<THREE.Texture | null>(null);
+  useEffect(() => {
+    const loader = new THREE.TextureLoader();
+    loader.load(path, (tex) => {
+      tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+      tex.repeat.set(...repeat);
+      setTexture(tex);
+    });
+  }, [path]);
+  return texture;
+}
 
 // ---------------------------------------------------------------------------
 // Zone positions - exported so NPCs / other systems can reference them
@@ -89,12 +103,13 @@ function Rock({ position, scale = 1 }: { position: [number, number, number]; sca
 
 function Beach({ isNight }: { isNight: boolean }) {
   const sandColor = isNight ? "#A89060" : "#F4D68C";
+  const sandTexture = useOptionalTexture("/textures/sand.jpg", [6, 3]);
   return (
     <group position={[ZONE_POSITIONS.beach[0], ZONE_POSITIONS.beach[1], ZONE_POSITIONS.beach[2]]}>
       {/* Sand area */}
       <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]} scale={[18, 6, 1]}>
         <circleGeometry args={[1, 32]} />
-        <meshStandardMaterial color={sandColor} roughness={1} />
+        <meshStandardMaterial color={sandColor} map={sandTexture ?? undefined} roughness={1} />
       </mesh>
 
       {/* Beach chairs */}
@@ -706,28 +721,29 @@ function WaterPlane({ isNight }: { isNight: boolean }) {
 
 function IslandGround({ isNight }: { isNight: boolean }) {
   const groundColor = isNight ? "#1E5C1E" : "#3CB043";
+  const grassTexture = useOptionalTexture("/textures/grass.jpg", [8, 8]);
 
   return (
     <group>
       {/* Main island - slightly irregular via overlapping ellipses */}
       <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]}>
         <circleGeometry args={[20, 48]} />
-        <meshStandardMaterial color={groundColor} roughness={0.95} />
+        <meshStandardMaterial color={groundColor} map={grassTexture ?? undefined} roughness={0.95} />
       </mesh>
       {/* Slight extension north */}
       <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, -6]} scale={[14, 10, 1]}>
         <circleGeometry args={[1, 32]} />
-        <meshStandardMaterial color={groundColor} roughness={0.95} />
+        <meshStandardMaterial color={groundColor} map={grassTexture ?? undefined} roughness={0.95} />
       </mesh>
       {/* Slight extension south-east for dock area */}
       <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[8, 0, 10]} scale={[10, 8, 1]}>
         <circleGeometry args={[1, 24]} />
-        <meshStandardMaterial color={groundColor} roughness={0.95} />
+        <meshStandardMaterial color={groundColor} map={grassTexture ?? undefined} roughness={0.95} />
       </mesh>
       {/* Slight extension south for beach */}
       <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 10]} scale={[15, 9, 1]}>
         <circleGeometry args={[1, 28]} />
-        <meshStandardMaterial color={groundColor} roughness={0.95} />
+        <meshStandardMaterial color={groundColor} map={grassTexture ?? undefined} roughness={0.95} />
       </mesh>
     </group>
   );

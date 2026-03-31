@@ -8,6 +8,8 @@ interface DialogueChoice {
   index: number;
   locked: boolean;
   lockReason?: string;
+  requiredStat?: string;
+  requiredValue?: number;
 }
 
 interface DialogueLine {
@@ -185,31 +187,41 @@ export default function DialogueBox({
         {/* Choices — only show after typewriter finishes for THIS line */}
         {isComplete && displayedText === line.text && !showGiftPicker && line.choices && line.choices.length > 0 && (
           <div className="flex flex-col gap-2 px-5 pb-4">
-            {line.choices.map((choice) => (
-              <button
-                key={choice.index}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (!choice.locked) onChoice(choice.index);
-                }}
-                disabled={choice.locked}
-                className={`min-h-[44px] rounded-xl px-4 py-3 text-left text-sm font-medium transition-all ${
-                  choice.locked
-                    ? "cursor-not-allowed border border-white/10 bg-white/5 text-white/30"
-                    : "border border-white/20 bg-white/10 text-white hover:border-white/40 hover:bg-white/20 active:scale-[0.98]"
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  {choice.locked && <span className="text-xs">{"\u{1F512}"}</span>}
-                  <span>{choice.text}</span>
-                </div>
-                {choice.locked && choice.lockReason && (
-                  <p className="mt-0.5 text-xs italic text-white/20">
-                    {choice.lockReason}
-                  </p>
-                )}
-              </button>
-            ))}
+            {line.choices.map((choice) => {
+              const isUnlockedSpecial = !choice.locked && choice.requiredStat;
+              return (
+                <button
+                  key={choice.index}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (!choice.locked) onChoice(choice.index);
+                  }}
+                  disabled={choice.locked}
+                  className={`min-h-[44px] rounded-xl px-4 py-3 text-left text-sm font-medium transition-all ${
+                    choice.locked
+                      ? "cursor-not-allowed border border-white/10 bg-white/5 text-white/30"
+                      : isUnlockedSpecial
+                        ? "border border-amber-400/40 bg-amber-500/15 text-amber-100 hover:border-amber-400/60 hover:bg-amber-500/25 active:scale-[0.98]"
+                        : "border border-white/20 bg-white/10 text-white hover:border-white/40 hover:bg-white/20 active:scale-[0.98]"
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    {choice.locked && <span className="text-xs">{"\u{1F512}"}</span>}
+                    {isUnlockedSpecial && (
+                      <span className="inline-flex items-center gap-1 rounded-md bg-amber-500/25 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-300">
+                        {"\u2728"} {choice.requiredValue} {choice.requiredStat}
+                      </span>
+                    )}
+                    <span>{choice.text}</span>
+                  </div>
+                  {choice.locked && choice.lockReason && (
+                    <p className="mt-0.5 text-xs italic text-white/20">
+                      {choice.lockReason}
+                    </p>
+                  )}
+                </button>
+              );
+            })}
           </div>
         )}
 

@@ -418,11 +418,10 @@ export function useGameLoop() {
     setState(s => ({ ...s, currentEvent: event, showEventScreen: true }));
   }, [state.dailyEvents]);
 
-  // Skip an event
-  const skipEvent = useCallback(() => {
-    gameStore.completeEvent();
+  // Close event screen without completing — player can re-open it later
+  const closeEventScreen = useCallback(() => {
     setState(s => ({ ...s, showEventScreen: false, currentEvent: null }));
-  }, [gameStore]);
+  }, []);
 
   // Challenge complete
   const handleChallengeComplete = useCallback((score: number, tier: string) => {
@@ -586,7 +585,7 @@ export function useGameLoop() {
     handleDialogueAdvance,
     triggerEvent,
     handleStartEvent,
-    skipEvent,
+    closeEventScreen,
     handleChallengeComplete,
     handleDateComplete,
     goToSleep,
