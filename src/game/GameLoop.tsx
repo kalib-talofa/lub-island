@@ -391,6 +391,11 @@ export function useGameLoop() {
     useBiometricStore.setState({ energy: Math.max(0, bio.energy - event.energyCost) });
     gameStore.startEvent(event.type);
 
+    // If player is inside the villa, exit first — all NPCs are outdoors
+    if (gameStore.isIndoors) {
+      gameStore.exitVilla();
+    }
+
     setState(s => ({ ...s, currentEvent: event, showEventScreen: false }));
 
     if (event.type === 'challenge') {

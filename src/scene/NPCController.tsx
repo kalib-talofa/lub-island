@@ -33,7 +33,7 @@ const ZONE_KEY_MAP: Record<string, string> = {
 const NPC_ZONE_OFFSETS: Record<string, [number, number]> = {
   rosie:    [ 3.0,  0.0], // Garden — beside the east bench, clear of fountain
   blaze:    [-1.5,  2.0], // Arena  — edge of the ring
-  pudge:    [ 2.5,  1.5], // Villa  — porch area, outside the building
+  pudge:    [ 0.0,  4.5], // Villa  — front porch, clear of building
   kiki:     [-2.0,  1.0], // Beach  — next to a beach chair
   sprocket: [ 2.0,  0.5], // Beach  — in front of umbrella
   lily:     [ 1.5,  2.0], // Jungle — on the trail, clear of trees
