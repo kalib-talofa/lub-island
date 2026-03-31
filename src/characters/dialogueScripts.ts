@@ -1849,9 +1849,60 @@ export const DATE_DIALOGUES: Record<string, DialogueScript> = {
   kiki: kiki_date,
 };
 
+// ---------------------------------------------------------------------------
+// Fallback one-liners when the player has already seen a script this day
+// ---------------------------------------------------------------------------
+
+const FALLBACK_LINES: Record<string, string[]> = {
+  rosie:    ["I'm still thinking about that last pun...", "The flowers here are bee-utiful today!", "Nice seeing you again! Hop over any time."],
+  blaze:    ["Back for more? I respect the persistence.", "Just strategizing. You know how it is.", "Hmm. Still sizing up the competition."],
+  pudge:    ["Oh, hi again... I was just, um, snacking.", "I tried a new recipe. Want some later?", "*waves shyly*"],
+  kiki:     ["Mm. The stars say we'll talk again soon.", "Some things are better left to mystery.", "*nods knowingly*"],
+  sprocket: ["Hey! Did you hear the one about-- wait, I told you already.", "What did the penguin say? ...I forgot the punchline.", "Still here, still funny. Allegedly."],
+  lily:     ["The ferns look peaceful today.", "I found a new mushroom by the trail. It's very round.", "*quiet smile*"],
+};
+
+function makeFallbackScript(npcId: string, npcName: string): DialogueScript {
+  const lines = FALLBACK_LINES[npcId] ?? ["Nice to see you again."];
+  const line = lines[Math.floor(Math.random() * lines.length)];
+  return {
+    id: `${npcId}_fallback`,
+    startNode: 'greet',
+    nodes: {
+      greet: {
+        id: 'greet',
+        speaker: npcName,
+        text: line,
+        // No next → dialogue ends after this line
+      },
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Seen-script tracking (resets each new in-game day)
+// ---------------------------------------------------------------------------
+
+const seenScripts = new Set<string>();
+
+export function resetSeenDialogues(): void {
+  seenScripts.clear();
+}
+
+export function markDialogueSeen(scriptId: string): void {
+  seenScripts.add(scriptId);
+}
+
+export function hasSeenDialogue(scriptId: string): boolean {
+  return seenScripts.has(scriptId);
+}
+
 /**
  * Pick the appropriate chat dialogue script for an NPC based on
  * the player's current relationship level with them.
+ *
+ * If the player has already seen that script today, returns a
+ * short fallback one-liner instead.
  *
  * Tier boundaries align with the relationship system:
  *   low  = relationship < 20   (hostile / cold / neutral)
@@ -1864,7 +1915,18 @@ export function getDialogueForNPC(npcId: string, relationship: number): Dialogue
     throw new Error(`No dialogue scripts found for NPC: ${npcId}`);
   }
 
-  if (relationship >= 60) return scripts[2] ?? scripts[scripts.length - 1];
-  if (relationship >= 20) return scripts[1] ?? scripts[0];
-  return scripts[0];
+  let script: DialogueScript;
+  if (relationship >= 60) script = scripts[2] ?? scripts[scripts.length - 1];
+  else if (relationship >= 20) script = scripts[1] ?? scripts[0];
+  else script = scripts[0];
+
+  // If already seen today, return a one-liner fallback
+  if (hasSeenDialogue(script.id)) {
+    // Find the NPC name from the first node's speaker field
+    const firstNode = script.nodes[script.startNode];
+    const name = firstNode?.speaker ?? npcId;
+    return makeFallbackScript(npcId, name);
+  }
+
+  return script;
 }

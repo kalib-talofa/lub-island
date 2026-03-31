@@ -18,17 +18,17 @@ const DAY_SKY_COLOR = new THREE.Color("#87CEEB"); // hemisphere sky
 const DAY_GROUND_COLOR = new THREE.Color("#4A8C3F"); // hemisphere ground
 const DAY_HEMI_INTENSITY = 0.5;
 
-// Nighttime lighting
-const NIGHT_AMBIENT_INTENSITY = 0.12;
-const NIGHT_DIR_INTENSITY = 0.35;
-const NIGHT_DIR_COLOR = new THREE.Color("#B0C4DE"); // cool moonlight
+// Nighttime lighting — brighter than before so gameplay is visible
+const NIGHT_AMBIENT_INTENSITY = 0.35;
+const NIGHT_DIR_INTENSITY = 0.45;
+const NIGHT_DIR_COLOR = new THREE.Color("#C8B8E8"); // soft purple moonlight
 const NIGHT_DIR_POSITION: [number, number, number] = [8, 18, -6];
-const NIGHT_SKY_COLOR = new THREE.Color("#0A0A2A");
-const NIGHT_GROUND_COLOR = new THREE.Color("#1A1A1A");
-const NIGHT_HEMI_INTENSITY = 0.15;
+const NIGHT_SKY_COLOR = new THREE.Color("#2A1A40"); // dark purple sky
+const NIGHT_GROUND_COLOR = new THREE.Color("#1A1A30"); // purple-tinted ground
+const NIGHT_HEMI_INTENSITY = 0.3;
 
-// Warm night point-lights (e.g. torches / villa lights)
-const NIGHT_POINT_INTENSITY = 1.2;
+// Warm night point-lights (torches / villa lights) — stronger emissive feel
+const NIGHT_POINT_INTENSITY = 2.5;
 const NIGHT_POINT_COLOR = new THREE.Color("#FF9944");
 
 const LERP_FACTOR = 0.02; // ~2-3s transition
@@ -164,22 +164,22 @@ export default function DayNightCycle({ isNight }: DayNightCycleProps) {
         args={[DAY_SKY_COLOR, DAY_GROUND_COLOR, DAY_HEMI_INTENSITY]}
       />
 
-      {/* Night warm point lights (villa area, dock area) */}
+      {/* Night warm point lights (villa area, beach/bonfire area) */}
       <pointLight
         ref={pointARef}
         color={NIGHT_POINT_COLOR}
         intensity={0}
-        distance={12}
-        decay={2}
-        position={[0, 2, 0]}
+        distance={18}
+        decay={1.5}
+        position={[0, 3, 0]}
       />
       <pointLight
         ref={pointBRef}
         color={NIGHT_POINT_COLOR}
         intensity={0}
-        distance={10}
-        decay={2}
-        position={[12, 2, 16]}
+        distance={15}
+        decay={1.5}
+        position={[0, 2, 16]}
       />
 
       {/* Starfield – drei Stars component wrapped in a group for fading */}

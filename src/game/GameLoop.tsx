@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useGameStore } from '@/store/gameStore';
 import { usePlayerStore } from '@/store/playerStore';
 import { useBiometricStore } from '@/store/biometricStore';
@@ -8,14 +8,14 @@ import { useRelationshipStore } from '@/store/relationshipStore';
 import { STARTING_CAST } from '@/characters/roster';
 import { generateDailyEvents } from '@/systems/events';
 import { canAfford } from '@/systems/energy';
-import { getDayType, getDayLabel } from '@/systems/calendar';
 import { calculateNPCChoice } from '@/systems/relationships';
-import { getDialogueForNPC } from '@/characters/dialogueScripts';
-import { DATE_DIALOGUES } from '@/characters/dialogueScripts';
+import { getDialogueForNPC, markDialogueSeen, resetSeenDialogues } from '@/characters/dialogueScripts';
 import { DialogueRunner, DialogueLine } from '@/utils/ink';
 import { ENERGY_COSTS } from '@/game/constants';
-import { GameEvent, Character } from '@/characters/CharacterData';
-import { getScoreTier, getRelationshipReward } from '@/systems/challenge';
+import { GameEvent, ItemDef } from '@/characters/CharacterData';
+import { getRelationshipReward } from '@/systems/challenge';
+import { generateNightlyDrops, DroppedItem } from '@/systems/items';
+import { ZONE_POSITIONS } from '@/scene/IslandEnvironment';
 
 // All the state the game loop manages
 export interface GameLoopState {
@@ -28,6 +28,7 @@ export interface GameLoopState {
   currentDialogue: DialogueRunner | null;
   currentLine: DialogueLine | null;
   currentNPCId: string | null;
+  currentScriptId: string | null;
 
   // Event screens
   showEventScreen: boolean;
@@ -39,10 +40,14 @@ export interface GameLoopState {
   showMainMenu: boolean;
   showProducerPhone: boolean;
   showItemPopup: boolean;
+  showInventory: boolean;
 
   // Item popup
   itemPopupName: string;
   itemPopupDesc: string;
+
+  // Dropped items in world
+  droppedItems: DroppedItem[];
 
   // Ceremony
   ceremonyPhase: 'choosing' | 'results';
@@ -70,6 +75,7 @@ export function useGameLoop() {
     currentDialogue: null,
     currentLine: null,
     currentNPCId: null,
+    currentScriptId: null,
     showEventScreen: false,
     showChallengeUI: false,
     showDateUI: false,
@@ -79,8 +85,10 @@ export function useGameLoop() {
     showMainMenu: true,
     showProducerPhone: false,
     showItemPopup: false,
+    showInventory: false,
     itemPopupName: '',
     itemPopupDesc: '',
+    droppedItems: [],
     ceremonyPhase: 'choosing',
     ceremonyResults: [],
     eliminatedThisCeremony: [],
@@ -95,11 +103,142 @@ export function useGameLoop() {
     [relStore.eliminated]
   );
 
+  // ---------------------------------------------------------------------------
+  // Inventory
+  // ---------------------------------------------------------------------------
+
+  const openInventory = useCallback(() => {
+    setState(s => ({ ...s, showInventory: true }));
+  }, []);
+
+  const closeInventory = useCallback(() => {
+    setState(s => ({ ...s, showInventory: false }));
+  }, []);
+
+  /** Handle "use" from the inventory UI */
+  const handleUseItem = useCallback((item: ItemDef) => {
+    switch (item.id) {
+      case 'chocolate': {
+        // Eat — restore energy
+        playerStore.removeItem(item.id);
+        useBiometricStore.setState((s) => ({ energy: Math.min(100, s.energy + 25) }));
+        setState(s => ({
+          ...s,
+          showInventory: false,
+          showItemPopup: true,
+          itemPopupName: 'Yum!',
+          itemPopupDesc: 'You ate the chocolate and restored 25 energy.',
+        }));
+        break;
+      }
+      case 'book': {
+        playerStore.removeItem(item.id);
+        playerStore.addPerformanceBoost(15);
+        setState(s => ({
+          ...s,
+          showInventory: false,
+          showItemPopup: true,
+          itemPopupName: 'Good Read!',
+          itemPopupDesc: 'Reading the book boosted your performance by 15 for today.',
+        }));
+        break;
+      }
+      case 'sunglasses': {
+        playerStore.removeItem(item.id);
+        playerStore.addPerformanceBoost(10);
+        setState(s => ({
+          ...s,
+          showInventory: false,
+          showItemPopup: true,
+          itemPopupName: 'Looking Cool!',
+          itemPopupDesc: 'Wearing sunglasses boosted your performance by 10 for today.',
+        }));
+        break;
+      }
+      case 'producer_phone': {
+        playerStore.removeItem(item.id);
+        setState(s => ({
+          ...s,
+          showInventory: false,
+          showProducerPhone: true,
+        }));
+        break;
+      }
+      default: {
+        // Character journals
+        if (item.id.startsWith('journal_') && item.ownerNpcId) {
+          const npc = STARTING_CAST.find(c => c.id === item.ownerNpcId);
+          const npcName = npc?.name ?? 'someone';
+          playerStore.unlockJournal(item.ownerNpcId);
+          setState(s => ({
+            ...s,
+            showInventory: false,
+            showItemPopup: true,
+            itemPopupName: `${npcName}'s Secrets`,
+            itemPopupDesc: `You read ${npcName}'s private journal. A special dialogue option is now unlocked when you speak with them!`,
+          }));
+          // Journal is NOT consumed — stays in inventory until end of day
+        }
+        break;
+      }
+    }
+  }, [playerStore]);
+
+  // ---------------------------------------------------------------------------
+  // Gifting during dialogue
+  // ---------------------------------------------------------------------------
+
+  const handleGiftItem = useCallback((item: ItemDef) => {
+    if (!state.currentNPCId) return;
+
+    const npcId = state.currentNPCId;
+    const npc = STARTING_CAST.find(c => c.id === npcId);
+    const npcName = npc?.name ?? 'them';
+
+    // Remove item from inventory
+    playerStore.removeItem(item.id);
+
+    // Boost relationship
+    relStore.changeRelationship(npcId, item.giftValue);
+
+    // Show a gift response line
+    const responseLine: DialogueLine = {
+      text: `*${npcName} looks delighted!* "Oh wow, ${item.name}?! That's so thoughtful of you!" (+${item.giftValue} relationship)`,
+      speaker: npcName,
+      choices: [],
+    };
+
+    setState(s => ({ ...s, currentLine: responseLine }));
+  }, [state.currentNPCId, playerStore, relStore]);
+
+  // ---------------------------------------------------------------------------
+  // Item pickups from world
+  // ---------------------------------------------------------------------------
+
+  const handleItemPickup = useCallback((index: number) => {
+    const drop = state.droppedItems[index];
+    if (!drop) return;
+
+    playerStore.addItem(drop.item);
+
+    // Remove from drops
+    setState(s => ({
+      ...s,
+      droppedItems: s.droppedItems.filter((_, i) => i !== index),
+      showItemPopup: true,
+      itemPopupName: `Found: ${drop.item.name}`,
+      itemPopupDesc: drop.item.description,
+    }));
+  }, [state.droppedItems, playerStore]);
+
+  // ---------------------------------------------------------------------------
+  // Game flow
+  // ---------------------------------------------------------------------------
+
   // Start game from main menu
   const startGame = useCallback(() => {
     gameStore.setPhase('MORNING_BRIEFING');
     const events = generateDailyEvents(gameStore.day, gameStore.week, activeCast);
-    const dayType = getDayType(gameStore.day);
     const briefingEvents = events.map(e => e.title);
 
     setState(s => ({
@@ -140,20 +279,22 @@ export function useGameLoop() {
 
     // Spend energy
     if (cost > 0) {
-      const newEnergy = bio.energy - cost;
-      // We need to reflect this - for prototype, directly modify the computed stat
-      // In production this would go through a proper energy system
-      useBiometricStore.setState({ energy: Math.max(0, newEnergy) });
+      useBiometricStore.setState({ energy: Math.max(0, bio.energy - cost) });
     }
 
     const relationship = relStore.getRelationship(npcId);
     const script = getDialogueForNPC(npcId, relationship);
 
     const runner = new DialogueRunner(script, {
+      charm: bio.charm,
+      energy: bio.energy,
+      performance: bio.performance + playerStore.performanceBoostToday,
       player_charm: bio.charm,
       player_energy: bio.energy,
-      player_performance: bio.performance,
+      player_performance: bio.performance + playerStore.performanceBoostToday,
       relationship_level: relationship,
+      // Journal unlock flag
+      journal_unlocked: playerStore.isJournalUnlocked(npcId) ? 1 : 0,
     });
 
     const line = runner.getCurrentLine();
@@ -164,8 +305,9 @@ export function useGameLoop() {
       currentDialogue: runner,
       currentLine: line,
       currentNPCId: npcId,
+      currentScriptId: script.id,
     }));
-  }, [state.dialogueActive, gameStore, bio, relStore]);
+  }, [state.dialogueActive, gameStore, bio, relStore, playerStore]);
 
   // Dialogue choice selected
   const handleDialogueChoice = useCallback((index: number) => {
@@ -185,19 +327,20 @@ export function useGameLoop() {
 
     const line = state.currentDialogue.getCurrentLine();
     if (!line || state.currentDialogue.isComplete()) {
-      // Dialogue ended
+      if (state.currentScriptId) markDialogueSeen(state.currentScriptId);
       setState(s => ({
         ...s,
         dialogueActive: false,
         currentDialogue: null,
         currentLine: null,
         currentNPCId: null,
+        currentScriptId: null,
       }));
       return;
     }
 
     setState(s => ({ ...s, currentLine: line }));
-  }, [state.currentDialogue, state.currentNPCId, relStore]);
+  }, [state.currentDialogue, state.currentNPCId, state.currentScriptId, relStore]);
 
   // Dialogue advance (no choices, just tap to continue)
   const handleDialogueAdvance = useCallback(() => {
@@ -205,7 +348,6 @@ export function useGameLoop() {
 
     const canAdvance = state.currentDialogue.advance();
     if (!canAdvance) {
-      // Dialogue ended
       if (state.currentNPCId) {
         const relChange = state.currentDialogue.getVariable('relationship_level') -
           relStore.getRelationship(state.currentNPCId);
@@ -247,12 +389,8 @@ export function useGameLoop() {
         dateNPCName: npc?.name || activeCast[0]?.name || 'Someone',
       }));
     } else {
-      // Social event - just a dialogue
       const npc = activeCast.find(c => event.involvedNPCs.includes(c.id));
-      if (npc) {
-        handleNPCInteract(npc.id);
-      }
-      // Complete event after dialogue
+      if (npc) handleNPCInteract(npc.id);
       setTimeout(() => {
         gameStore.completeEvent();
         setState(s => ({ ...s, currentEvent: null }));
@@ -276,7 +414,6 @@ export function useGameLoop() {
   // Challenge complete
   const handleChallengeComplete = useCallback((score: number, tier: string) => {
     const reward = getRelationshipReward(tier as 'bronze' | 'silver' | 'gold');
-    // Boost relationship with all active NPCs (they were "watching")
     activeCast.forEach(npc => {
       relStore.changeRelationship(npc.id, Math.round(reward * 0.5));
     });
@@ -297,13 +434,17 @@ export function useGameLoop() {
     setState(s => ({ ...s, showDateUI: false, currentEvent: null, dateNPCId: '', dateNPCName: '' }));
   }, [state.dateNPCId, relStore, playerStore, gameStore]);
 
-  // Transition to night (called when events run out or player chooses to rest)
-  const goToNight = useCallback(() => {
-    gameStore.transitionToNight();
-  }, [gameStore]);
-
   // Go to sleep
   const goToSleep = useCallback(() => {
+    // If transitioning to night (from daytime), spawn nightly item drops
+    if (gameStore.phase === 'DAYTIME_FREE') {
+      gameStore.advanceToNight();
+      const drops = generateNightlyDrops(ZONE_POSITIONS);
+      setState(s => ({ ...s, droppedItems: drops }));
+      return;
+    }
+
+    // From nighttime, go to actual sleep
     gameStore.setPhase('SLEEP_TRANSITION');
     setState(s => ({ ...s, showSleepTransition: true }));
   }, [gameStore]);
@@ -311,6 +452,10 @@ export function useGameLoop() {
   // Continue from sleep - advance day
   const continueSleep = useCallback(() => {
     setState(s => ({ ...s, showSleepTransition: false }));
+
+    // Reset daily state
+    resetSeenDialogues();
+    playerStore.clearDayBuffs();
 
     // Check if it's ceremony day next
     if (gameStore.day === 7) {
@@ -327,22 +472,19 @@ export function useGameLoop() {
       showMorningBriefing: true,
       dailyEvents: events,
       briefingEvents,
+      droppedItems: [], // Clear leftover drops
     }));
-  }, [gameStore, activeCast]);
+  }, [gameStore, activeCast, playerStore]);
 
   // Ceremony - player chooses partner
   const handleCeremonyChoice = useCallback((npcId: string) => {
-    // Player chose their partner
     relStore.setPartner('player', npcId);
 
-    // NPCs choose their partners based on relationships
     const results: { npcId: string; partnerId: string | null }[] = [
       { npcId: 'player', partnerId: npcId }
     ];
 
     const takenIds = new Set([npcId, 'player']);
-
-    // Each NPC picks in order of confidence (most confident first)
     const sortedCast = [...activeCast].sort((a, b) => b.personality.confidence - a.personality.confidence);
 
     for (const npc of sortedCast) {
@@ -365,7 +507,6 @@ export function useGameLoop() {
       takenIds.add(chosenId);
     }
 
-    // Find eliminated - NPCs with no partner
     const chosen = new Set(results.map(r => r.partnerId).filter(Boolean));
     const eliminated = activeCast
       .filter(npc => !chosen.has(npc.id) && !results.find(r => r.npcId === npc.id && r.partnerId !== null))
@@ -391,20 +532,23 @@ export function useGameLoop() {
       eliminatedThisCeremony: [],
     }));
 
-    gameStore.advanceDay(); // Moves to day 1 of next week
+    resetSeenDialogues();
+    playerStore.clearDayBuffs();
+
+    gameStore.advanceDay();
     const events = generateDailyEvents(1, gameStore.week + 1, activeCast);
     setState(s => ({
       ...s,
       showMorningBriefing: true,
       dailyEvents: events,
       briefingEvents: events.map(e => e.title),
+      droppedItems: [],
     }));
-  }, [gameStore, activeCast]);
+  }, [gameStore, activeCast, playerStore]);
 
   // Producer phone
   const handleProducerPhone = useCallback((eventType: string) => {
     setState(s => ({ ...s, showProducerPhone: false }));
-    // For prototype: just show a confirmation
     setState(s => ({
       ...s,
       showItemPopup: true,
@@ -431,12 +575,17 @@ export function useGameLoop() {
     skipEvent,
     handleChallengeComplete,
     handleDateComplete,
-    goToNight,
     goToSleep,
     continueSleep,
     handleCeremonyChoice,
     continueCeremony,
     handleProducerPhone,
     dismissItemPopup,
+    // Item system
+    openInventory,
+    closeInventory,
+    handleUseItem,
+    handleGiftItem,
+    handleItemPickup,
   };
 }

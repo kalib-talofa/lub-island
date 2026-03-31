@@ -5,21 +5,26 @@ import { useBiometricStore } from "@/store/biometricStore";
 import { usePlayerStore } from "@/store/playerStore";
 import { EVENTS_PER_DAY, DAYS_PER_WEEK } from "@/game/constants";
 
-export default function HUD() {
-  const { day, isNight, eventsCompleted, eventsRemaining, phase } =
-    useGameStore();
+interface HUDProps {
+  onOpenInventory?: () => void;
+}
+
+export default function HUD({ onOpenInventory }: HUDProps) {
+  const { day, isNight, eventsCompleted, phase } = useGameStore();
   const { energy, charm, performance } = useBiometricStore();
-  const { inventory } = usePlayerStore();
+  const { inventory, performanceBoostToday } = usePlayerStore();
 
   const visible = phase === "DAYTIME_FREE" || phase === "NIGHTTIME_FREE";
   if (!visible) return null;
 
   const totalEvents = EVENTS_PER_DAY;
+  const itemCount = inventory.length;
+  const displayPerf = Math.round(performance + performanceBoostToday);
 
   return (
     <div className="pointer-events-none fixed inset-x-0 top-0 z-50 flex flex-col gap-1.5 p-2">
       {/* Row 1: Day / Time + Stats */}
-      <div className="pointer-events-auto flex items-center gap-2 rounded-xl bg-black/60 px-3 py-2 backdrop-blur-sm">
+      <div className="pointer-events-auto flex items-center gap-2 rounded-xl bg-black/60 px-4 py-2 backdrop-blur-sm">
         {/* Day & time icon */}
         <div className="flex items-center gap-1.5 text-sm font-bold text-white">
           <span className="text-base">{isNight ? "\u{1F319}" : "\u{2600}\u{FE0F}"}</span>
@@ -62,15 +67,18 @@ export default function HUD() {
             {"\u{1F3C3}"}
           </span>
           <span className="text-xs font-semibold text-blue-300">
-            {Math.round(performance)}
+            {displayPerf}
+            {performanceBoostToday > 0 && (
+              <span className="text-emerald-400"> +{performanceBoostToday}</span>
+            )}
           </span>
         </div>
       </div>
 
-      {/* Row 2: Event dots + Inventory */}
-      <div className="pointer-events-auto flex items-center gap-2 rounded-xl bg-black/50 px-3 py-1.5 backdrop-blur-sm">
+      {/* Row 2: Event dots + Bag button */}
+      <div className="pointer-events-auto flex items-center gap-2 rounded-xl bg-black/50 px-4 py-1.5 backdrop-blur-sm">
         {/* Event dots */}
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1.5">
           <span className="text-[10px] font-medium uppercase tracking-wider text-white/60">
             Events
           </span>
@@ -88,37 +96,19 @@ export default function HUD() {
 
         <div className="flex-1" />
 
-        {/* Inventory */}
-        <div className="flex items-center gap-1">
-          {Array.from({ length: 3 }).map((_, i) => {
-            const item = inventory[i];
-            return (
-              <div
-                key={i}
-                className="flex h-7 w-7 items-center justify-center rounded-md border border-white/20 bg-white/10 text-xs"
-                title={item?.name}
-              >
-                {item ? (
-                  <span className="text-sm">
-                    {item.effect === "gift_relationship"
-                      ? "\u{1F490}"
-                      : item.effect === "energy_restore"
-                        ? "\u{1F34E}"
-                        : item.effect === "charm_boost"
-                          ? "\u2728"
-                          : item.effect === "producer_phone"
-                            ? "\u{1F4F1}"
-                            : item.effect === "reveal_info"
-                              ? "\u{1F50D}"
-                              : "\u{1F4E6}"}
-                  </span>
-                ) : (
-                  <span className="text-[10px] text-white/20">{"\u00B7"}</span>
-                )}
-              </div>
-            );
-          })}
-        </div>
+        {/* Inventory button */}
+        <button
+          onClick={onOpenInventory}
+          className="relative flex h-9 items-center gap-1.5 rounded-lg border border-white/20 bg-white/10 px-3.5 transition hover:bg-white/20 active:scale-95"
+        >
+          <span className="text-base">{"\u{1F392}"}</span>
+          <span className="text-xs font-semibold text-white/80">Inventory</span>
+          {itemCount > 0 && (
+            <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-bold text-black">
+              {itemCount}
+            </span>
+          )}
+        </button>
       </div>
     </div>
   );

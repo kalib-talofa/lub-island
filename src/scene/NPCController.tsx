@@ -348,14 +348,14 @@ function SingleNPC({ npcId, name, species, bodyColor, position, onInteract }: Si
 
       {/* Interaction bubble - white sphere with "!" */}
       <group ref={bubbleRef} visible={false}>
-        <mesh position={[0, 1.85, 0]}>
-          <sphereGeometry args={[0.15, 10, 10]} />
+        <mesh position={[0, 1.9, 0]}>
+          <sphereGeometry args={[0.22, 12, 12]} />
           <meshStandardMaterial color="#FFFFFF" roughness={0.3} />
         </mesh>
         <Text
-          position={[0, 1.85, 0.16]}
-          fontSize={0.16}
-          color="#FF4444"
+          position={[0, 1.9, 0.23]}
+          fontSize={0.40}
+          color="#FF2222"
           anchorX="center"
           anchorY="middle"
           fontWeight="bold"

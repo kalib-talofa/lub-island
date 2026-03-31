@@ -6,6 +6,8 @@ import { useBiometricStore } from '@/store/biometricStore';
 import { useGameStore } from '@/store/gameStore';
 import { useRelationshipStore } from '@/store/relationshipStore';
 import { usePlayerStore } from '@/store/playerStore';
+import { cameraAngleRef } from '@/scene/IsometricCamera';
+import { ITEM_DEFS, JOURNAL_DEFS } from '@/systems/items';
 
 export default function DevToolbar() {
   const [visible, setVisible] = useState(true);
@@ -73,6 +75,45 @@ export default function DevToolbar() {
     gameFolder.add({ advanceToCeremony: () => useGameStore.getState().advanceToCeremony() }, 'advanceToCeremony').name('🏛️ Advance to Ceremony');
     gameFolder.add({ resetWeek: () => useGameStore.getState().resetWeek() }, 'resetWeek').name('🔄 Reset Week');
 
+    // Camera angle slider
+    const cameraFolder = gui.addFolder('📷 Camera');
+    const cameraProxy = { angle: cameraAngleRef.current };
+    cameraFolder.add(cameraProxy, 'angle', 0, 100, 1).name('Camera Angle').onChange((v: number) => {
+      cameraAngleRef.current = v;
+    });
+
+    // Items - add any item to inventory
+    const itemsFolder = gui.addFolder('🎒 Items');
+    itemsFolder.close(); // start collapsed
+
+    // Regular items
+    const regularFolder = itemsFolder.addFolder('Regular Items');
+    ITEM_DEFS.forEach(item => {
+      regularFolder.add(
+        { [`add_${item.id}`]: () => usePlayerStore.getState().addItem(item) },
+        `add_${item.id}`,
+      ).name(`+ ${item.name}`);
+    });
+
+    // Journals
+    const journalFolder = itemsFolder.addFolder('Character Journals');
+    JOURNAL_DEFS.forEach(item => {
+      journalFolder.add(
+        { [`add_${item.id}`]: () => usePlayerStore.getState().addItem(item) },
+        `add_${item.id}`,
+      ).name(`+ ${item.name}`);
+    });
+
+    // Clear inventory
+    itemsFolder.add(
+      { clear: () => usePlayerStore.setState({ inventory: [] }) },
+      'clear',
+    ).name('🗑️ Clear Inventory');
+
+    // Inventory count display
+    const itemProxy = { count: usePlayerStore.getState().inventory.length };
+    const itemCountCtrl = itemsFolder.add(itemProxy, 'count').name('Items in Bag').disable();
+
     // Relationship controls
     const relFolder = gui.addFolder('💕 Relationships');
     const relProxy: Record<string, number> = {};
@@ -104,6 +145,11 @@ export default function DevToolbar() {
       dayCtrl.updateDisplay();
       eventsCtrl.updateDisplay();
       phaseCtrl.updateDisplay();
+
+      // Items
+      const player = usePlayerStore.getState();
+      itemProxy.count = player.inventory.length;
+      itemCountCtrl.updateDisplay();
 
       Object.keys(rel.relationships).forEach(npcId => {
         if (relProxy[npcId] !== undefined) {

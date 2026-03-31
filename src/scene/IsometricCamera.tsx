@@ -7,11 +7,43 @@ import { CAMERA } from "@/game/constants";
 import { playerPositionRef } from "@/scene/PlayerController";
 
 // ---------------------------------------------------------------------------
-// Isometric offset – 45° Y rotation, ~33° X tilt
-// The length of this vector controls how far the camera sits from the player.
+// Camera angle control (0-100, default 50)
+//   0   = low angle, close to ground, zoomed in
+//   50  = default isometric (20,20,20) at zoom 60
+//   100 = high bird's-eye, zoomed out
 // ---------------------------------------------------------------------------
 
-const ISO_OFFSET = new THREE.Vector3(20, 20, 20);
+/** Shared ref — writable from DevToolbar, pinch gestures, etc. */
+export const cameraAngleRef = { current: 50 };
+
+// Presets at the three key points of the slider
+const LOW_OFFSET = new THREE.Vector3(15, 8, 15);   // slider = 0
+const MID_OFFSET = new THREE.Vector3(20, 20, 20);  // slider = 50
+const HIGH_OFFSET = new THREE.Vector3(25, 35, 25);  // slider = 100
+
+const LOW_ZOOM = 85;
+const MID_ZOOM = 60;
+const HIGH_ZOOM = 38;
+
+/** Compute offset & zoom from the 0-100 slider value */
+function getOffsetAndZoom(slider: number) {
+  const t = THREE.MathUtils.clamp(slider, 0, 100);
+  if (t <= 50) {
+    // Interpolate LOW → MID
+    const f = t / 50;
+    return {
+      offset: _scratch1.copy(LOW_OFFSET).lerp(MID_OFFSET, f),
+      zoom: THREE.MathUtils.lerp(LOW_ZOOM, MID_ZOOM, f),
+    };
+  } else {
+    // Interpolate MID → HIGH
+    const f = (t - 50) / 50;
+    return {
+      offset: _scratch1.copy(MID_OFFSET).lerp(HIGH_OFFSET, f),
+      zoom: THREE.MathUtils.lerp(MID_ZOOM, HIGH_ZOOM, f),
+    };
+  }
+}
 
 /**
  * Portrait framing offset: shifts the look-target slightly *above* the
@@ -28,6 +60,7 @@ export default function IsometricCamera() {
   const { camera } = useThree();
   const smoothTarget = useRef(new THREE.Vector3());
   const smoothPosition = useRef(new THREE.Vector3());
+  const smoothZoom = useRef(MID_ZOOM);
   const initialised = useRef(false);
 
   useFrame(() => {
@@ -35,18 +68,20 @@ export default function IsometricCamera() {
     if (!(camera instanceof THREE.OrthographicCamera)) return;
 
     const playerPos = playerPositionRef.current;
+    const { offset, zoom } = getOffsetAndZoom(cameraAngleRef.current);
 
     // First frame: snap to position instead of lerping from origin
     if (!initialised.current) {
       smoothTarget.current.copy(playerPos);
-      smoothPosition.current.copy(playerPos).add(ISO_OFFSET);
+      smoothPosition.current.copy(playerPos).add(offset);
+      smoothZoom.current = zoom;
       camera.position.copy(smoothPosition.current);
       camera.lookAt(
         playerPos.x + LOOK_AHEAD_OFFSET.x,
         playerPos.y + LOOK_AHEAD_OFFSET.y,
         playerPos.z + LOOK_AHEAD_OFFSET.z,
       );
-      camera.zoom = CAMERA.ZOOM;
+      camera.zoom = zoom;
       camera.near = CAMERA.NEAR;
       camera.far = CAMERA.FAR;
       camera.updateProjectionMatrix();
@@ -56,11 +91,12 @@ export default function IsometricCamera() {
 
     // Desired positions
     const desiredTarget = playerPos;
-    const desiredPosition = _v.copy(playerPos).add(ISO_OFFSET);
+    const desiredPosition = _v.copy(playerPos).add(offset);
 
     // Smooth lerp
     smoothTarget.current.lerp(desiredTarget, CAMERA.LERP_FACTOR);
     smoothPosition.current.lerp(desiredPosition, CAMERA.LERP_FACTOR);
+    smoothZoom.current += (zoom - smoothZoom.current) * CAMERA.LERP_FACTOR;
 
     camera.position.copy(smoothPosition.current);
     camera.lookAt(
@@ -69,12 +105,13 @@ export default function IsometricCamera() {
       smoothTarget.current.z + LOOK_AHEAD_OFFSET.z,
     );
 
-    camera.zoom = CAMERA.ZOOM;
+    camera.zoom = smoothZoom.current;
     camera.updateProjectionMatrix();
   });
 
   return null;
 }
 
-// Scratch vector to avoid per-frame allocations
+// Scratch vectors to avoid per-frame allocations
 const _v = new THREE.Vector3();
+const _scratch1 = new THREE.Vector3();

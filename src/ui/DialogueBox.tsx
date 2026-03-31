@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import type { ItemDef } from "@/characters/CharacterData";
 
 interface DialogueChoice {
   text: string;
@@ -20,6 +21,22 @@ interface DialogueBoxProps {
   onChoice: (index: number) => void;
   onAdvance: () => void;
   speakerColor?: string;
+  /** Items available for gifting (empty = no gift button) */
+  giftableItems?: ItemDef[];
+  /** Called when player gifts an item */
+  onGift?: (item: ItemDef) => void;
+}
+
+// Emoji icon per item id
+const ITEM_ICONS: Record<string, string> = {
+  flowers: "\u{1F490}",
+  chocolate: "\u{1F36B}",
+  book: "\u{1F4D6}",
+  sunglasses: "\u{1F576}\u{FE0F}",
+};
+
+function getItemIcon(item: ItemDef): string {
+  return ITEM_ICONS[item.id] ?? "\u{1F4E6}";
 }
 
 export default function DialogueBox({
@@ -27,9 +44,12 @@ export default function DialogueBox({
   onChoice,
   onAdvance,
   speakerColor = "#f472b6",
+  giftableItems = [],
+  onGift,
 }: DialogueBoxProps) {
   const [displayedText, setDisplayedText] = useState("");
   const [isComplete, setIsComplete] = useState(false);
+  const [showGiftPicker, setShowGiftPicker] = useState(false);
   const charIndex = useRef(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -38,6 +58,7 @@ export default function DialogueBox({
     charIndex.current = 0;
     setDisplayedText("");
     setIsComplete(false);
+    setShowGiftPicker(false);
 
     timerRef.current = setInterval(() => {
       charIndex.current += 1;
@@ -56,6 +77,7 @@ export default function DialogueBox({
   }, [line.text]);
 
   const handleTap = useCallback(() => {
+    if (showGiftPicker) return; // don't advance while gift picker is open
     if (!isComplete) {
       // Skip to full text
       if (timerRef.current) clearInterval(timerRef.current);
@@ -64,7 +86,14 @@ export default function DialogueBox({
     } else if (!line.choices || line.choices.length === 0) {
       onAdvance();
     }
-  }, [isComplete, line.text, line.choices, onAdvance]);
+  }, [isComplete, line.text, line.choices, onAdvance, showGiftPicker]);
+
+  const handleGift = useCallback((item: ItemDef) => {
+    setShowGiftPicker(false);
+    onGift?.(item);
+  }, [onGift]);
+
+  const hasGiftableItems = giftableItems.length > 0 && onGift;
 
   return (
     <div className="pointer-events-auto fixed inset-x-0 bottom-0 z-50 flex flex-col">
@@ -74,7 +103,7 @@ export default function DialogueBox({
       >
         {/* Speaker header */}
         <div
-          className="rounded-t-2xl px-4 py-2"
+          className="flex items-center justify-between rounded-t-2xl px-5 py-2.5"
           style={{ backgroundColor: speakerColor + "30" }}
         >
           <span
@@ -83,10 +112,52 @@ export default function DialogueBox({
           >
             {line.speaker}
           </span>
+
+          {/* Gift button — always visible when player has giftable items */}
+          {hasGiftableItems && isComplete && displayedText === line.text && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowGiftPicker(!showGiftPicker);
+              }}
+              className={`flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold transition active:scale-95 ${
+                showGiftPicker
+                  ? "bg-pink-600 text-white"
+                  : "bg-white/10 text-white/70 hover:bg-white/20"
+              }`}
+            >
+              {"\u{1F381}"} Gift
+            </button>
+          )}
         </div>
 
+        {/* Gift picker dropdown */}
+        {showGiftPicker && (
+          <div
+            className="border-b border-white/10 bg-black/40 px-5 py-3"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p className="mb-2 text-[10px] font-medium uppercase tracking-wider text-white/40">
+              Choose an item to gift
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {giftableItems.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => handleGift(item)}
+                  className="flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-2.5 py-1.5 text-xs text-white transition hover:bg-white/15 active:scale-95"
+                >
+                  <span className="text-sm">{getItemIcon(item)}</span>
+                  <span>{item.name}</span>
+                  <span className="text-white/30">(+{item.giftValue})</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Text body */}
-        <div className="flex-1 px-4 py-3">
+        <div className="flex-1 px-5 py-3">
           <p className="text-base leading-relaxed text-white/90">
             {displayedText}
             {!isComplete && (
@@ -95,9 +166,9 @@ export default function DialogueBox({
           </p>
         </div>
 
-        {/* Choices */}
-        {isComplete && line.choices && line.choices.length > 0 && (
-          <div className="flex flex-col gap-2 px-4 pb-4">
+        {/* Choices — only show after typewriter finishes for THIS line */}
+        {isComplete && displayedText === line.text && !showGiftPicker && line.choices && line.choices.length > 0 && (
+          <div className="flex flex-col gap-2 px-5 pb-4">
             {line.choices.map((choice) => (
               <button
                 key={choice.index}
@@ -127,7 +198,7 @@ export default function DialogueBox({
         )}
 
         {/* Tap to continue hint */}
-        {isComplete && (!line.choices || line.choices.length === 0) && (
+        {isComplete && displayedText === line.text && !showGiftPicker && (!line.choices || line.choices.length === 0) && (
           <div className="pb-4 text-center">
             <span className="animate-pulse text-xs text-white/40">
               Tap to continue

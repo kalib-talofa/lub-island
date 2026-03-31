@@ -565,24 +565,73 @@ function StringLights({ isNight }: { isNight: boolean }) {
     return points;
   }, []);
 
+  // Sample a few evenly-spaced points per path for actual point lights.
+  // We don't want 32 lights — just ~2-3 per string is enough to pool warm
+  // light onto the ground beneath the strings.
+  const poolLights = useMemo(() => {
+    const lights: [number, number, number][] = [];
+    // Villa-to-beach path: pick indices 3, 7, 11 (roughly 1/4, 2/3, end)
+    [3, 7, 11].forEach(i => {
+      const t = i / 11;
+      lights.push([
+        Math.sin(t * 4) * 1.5,
+        1.4, // slightly below the bulbs so light hits the ground
+        THREE.MathUtils.lerp(3, 14, t),
+      ]);
+    });
+    // Villa-to-garden path: pick indices 2, 6, 9
+    [2, 6, 9].forEach(i => {
+      const t = i / 9;
+      lights.push([
+        THREE.MathUtils.lerp(3, 14, t),
+        1.4,
+        THREE.MathUtils.lerp(0, 2, t) + Math.sin(t * 3) * 1.0,
+      ]);
+    });
+    // Villa-to-arena path: pick indices 2, 6, 9
+    [2, 6, 9].forEach(i => {
+      const t = i / 9;
+      lights.push([
+        THREE.MathUtils.lerp(-3, -14, t),
+        1.4,
+        THREE.MathUtils.lerp(0, 2, t) + Math.sin(t * 3) * 1.0,
+      ]);
+    });
+    return lights;
+  }, []);
+
   const emissiveIntensity = isNight ? 2.0 : 0;
   const lightColor = "#FFE4B0";
 
   if (!isNight) return null;
 
   return (
-    <Instances limit={40}>
-      <sphereGeometry args={[0.08, 6, 6]} />
-      <meshStandardMaterial
-        color={lightColor}
-        emissive={lightColor}
-        emissiveIntensity={emissiveIntensity}
-        toneMapped={false}
-      />
-      {lightPaths.map((pos, i) => (
-        <Instance key={i} position={pos} />
+    <>
+      <Instances limit={40}>
+        <sphereGeometry args={[0.08, 6, 6]} />
+        <meshStandardMaterial
+          color={lightColor}
+          emissive={lightColor}
+          emissiveIntensity={emissiveIntensity}
+          toneMapped={false}
+        />
+        {lightPaths.map((pos, i) => (
+          <Instance key={i} position={pos} />
+        ))}
+      </Instances>
+
+      {/* Point lights that project warm pools onto the ground beneath each string */}
+      {poolLights.map((pos, i) => (
+        <pointLight
+          key={`sl-${i}`}
+          position={pos}
+          color="#FFD08A"
+          intensity={1.2}
+          distance={8}
+          decay={1.8}
+        />
       ))}
-    </Instances>
+    </>
   );
 }
 

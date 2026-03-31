@@ -55,14 +55,22 @@ export interface GameEvent {
   involvedNPCs: string[];
 }
 
+export type ItemEffect = 'gift_relationship' | 'energy_restore' | 'charm_boost' | 'reveal_info' | 'producer_phone' | 'cosmetic' | 'performance_boost';
+
 export interface ItemDef {
   id: string;
   name: string;
   description: string;
-  effect: 'gift_relationship' | 'energy_restore' | 'charm_boost' | 'reveal_info' | 'producer_phone' | 'cosmetic';
+  effect: ItemEffect;
   effectValue: number;
   spawnZones: string[];
   rarity: 'common' | 'uncommon' | 'rare';
+  /** For character journals — which NPC this journal belongs to */
+  ownerNpcId?: string;
+  /** Gift value when given to an NPC (0 = cannot gift) */
+  giftValue: number;
+  /** Whether the item is consumed on use (false = reusable like journals) */
+  consumeOnUse: boolean;
 }
 
 export interface BiometricData {

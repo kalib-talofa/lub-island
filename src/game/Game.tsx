@@ -1,12 +1,13 @@
 'use client';
 
 import { Canvas } from '@react-three/fiber';
-import { Suspense } from 'react';
+import { Suspense, useEffect, useRef } from 'react';
 import Island from '@/scene/Island';
 import { useGameLoop } from './GameLoop';
 import { useGameStore } from '@/store/gameStore';
 import { useBiometricStore } from '@/store/biometricStore';
 import { useRelationshipStore } from '@/store/relationshipStore';
+import { usePlayerStore } from '@/store/playerStore';
 import { STARTING_CAST } from '@/characters/roster';
 import HUD from '@/ui/HUD';
 import DialogueBox from '@/ui/DialogueBox';
@@ -20,12 +21,15 @@ import CeremonyUI from '@/ui/CeremonyUI';
 import SleepTransition from '@/ui/SleepTransition';
 import ItemPopup from '@/ui/ItemPopup';
 import ProducerPhone from '@/ui/ProducerPhone';
+import InventoryUI from '@/ui/InventoryUI';
 import { canAfford } from '@/systems/energy';
+import { cameraAngleRef } from '@/scene/IsometricCamera';
 
 export default function Game() {
   const gameStore = useGameStore();
   const bio = useBiometricStore();
   const relStore = useRelationshipStore();
+  const playerStore = usePlayerStore();
 
   const {
     state,
@@ -46,18 +50,85 @@ export default function Game() {
     continueCeremony,
     handleProducerPhone,
     dismissItemPopup,
+    openInventory,
+    closeInventory,
+    handleUseItem,
+    handleGiftItem,
+    handleItemPickup,
   } = useGameLoop();
 
   const showFreeRoamUI = gameStore.phase === 'DAYTIME_FREE' || gameStore.phase === 'NIGHTTIME_FREE';
 
-  // NPC speaker color map
-  const getNPCColor = (npcId: string | null) => {
-    const npc = STARTING_CAST.find(c => c.id === npcId);
-    return npc?.colorPalette.primary || '#ffffff';
+  // NPC speaker colour map – bright enough to read on the dark dialogue box
+  const NPC_DIALOGUE_COLORS: Record<string, string> = {
+    rosie:    '#F4A6C0',
+    blaze:    '#FF8C42',
+    pudge:    '#D4A574',
+    kiki:     '#C8A8E8',
+    sprocket: '#FFD866',
+    lily:     '#7ED67E',
   };
 
+  const getNPCColor = (npcId: string | null) => {
+    if (!npcId) return '#ffffff';
+    return NPC_DIALOGUE_COLORS[npcId] ?? '#ffffff';
+  };
+
+  // ---------------------------------------------------------------------------
+  // Pinch-to-zoom → camera angle
+  // ---------------------------------------------------------------------------
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const lastPinchDist = useRef<number | null>(null);
+
+  useEffect(() => {
+    const el = viewportRef.current;
+    if (!el) return;
+
+    function getTouchDist(e: TouchEvent) {
+      const [a, b] = [e.touches[0], e.touches[1]];
+      const dx = a.clientX - b.clientX;
+      const dy = a.clientY - b.clientY;
+      return Math.sqrt(dx * dx + dy * dy);
+    }
+
+    function onTouchStart(e: TouchEvent) {
+      if (e.touches.length === 2) {
+        lastPinchDist.current = getTouchDist(e);
+      }
+    }
+
+    function onTouchMove(e: TouchEvent) {
+      if (e.touches.length !== 2 || lastPinchDist.current === null) return;
+      const dist = getTouchDist(e);
+      const delta = dist - lastPinchDist.current;
+      cameraAngleRef.current = Math.max(0, Math.min(100,
+        cameraAngleRef.current - delta * 0.5,
+      ));
+      lastPinchDist.current = dist;
+    }
+
+    function onTouchEnd() {
+      lastPinchDist.current = null;
+    }
+
+    el.addEventListener('touchstart', onTouchStart, { passive: true });
+    el.addEventListener('touchmove', onTouchMove, { passive: true });
+    el.addEventListener('touchend', onTouchEnd);
+    el.addEventListener('touchcancel', onTouchEnd);
+
+    return () => {
+      el.removeEventListener('touchstart', onTouchStart);
+      el.removeEventListener('touchmove', onTouchMove);
+      el.removeEventListener('touchend', onTouchEnd);
+      el.removeEventListener('touchcancel', onTouchEnd);
+    };
+  }, []);
+
+  // Get giftable items for dialogue
+  const giftableItems = state.dialogueActive ? playerStore.getGiftableItems() : [];
+
   return (
-    <div className="game-viewport" style={{ position: 'relative' }}>
+    <div ref={viewportRef} className="game-viewport" style={{ position: 'relative' }}>
       {/* 3D Scene */}
       <Canvas
         orthographic
@@ -66,7 +137,11 @@ export default function Game() {
         gl={{ antialias: true, alpha: false }}
       >
         <Suspense fallback={null}>
-          <Island onNPCInteract={handleNPCInteract} />
+          <Island
+            onNPCInteract={handleNPCInteract}
+            droppedItems={state.droppedItems}
+            onItemPickup={handleItemPickup}
+          />
         </Suspense>
       </Canvas>
 
@@ -75,7 +150,7 @@ export default function Game() {
         {/* HUD */}
         {showFreeRoamUI && (
           <div style={{ pointerEvents: 'auto' }}>
-            <HUD />
+            <HUD onOpenInventory={openInventory} />
           </div>
         )}
 
@@ -113,7 +188,7 @@ export default function Game() {
                   boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
                 }}
               >
-                {evt.type === 'challenge' ? '⚔️' : evt.type === 'date' ? '💕' : '🎉'} {evt.title}
+                {evt.type === 'challenge' ? '\u2694\uFE0F' : evt.type === 'date' ? '\u{1F495}' : '\u{1F389}'} {evt.title}
               </button>
             ))}
 
@@ -131,7 +206,7 @@ export default function Game() {
                 cursor: 'pointer',
               }}
             >
-              😴 Rest (skip remaining)
+              {"\u{1F634}"} Rest (skip remaining)
             </button>
           </div>
         )}
@@ -154,7 +229,7 @@ export default function Game() {
                 boxShadow: '0 2px 12px rgba(99,102,241,0.4)',
               }}
             >
-              🌙 Go to Sleep
+              {"\u{1F319}"} Go to Sleep
             </button>
           </div>
         )}
@@ -167,7 +242,16 @@ export default function Game() {
               onChoice={handleDialogueChoice}
               onAdvance={handleDialogueAdvance}
               speakerColor={getNPCColor(state.currentNPCId)}
+              giftableItems={giftableItems}
+              onGift={handleGiftItem}
             />
+          </div>
+        )}
+
+        {/* Inventory */}
+        {state.showInventory && (
+          <div style={{ pointerEvents: 'auto' }}>
+            <InventoryUI onClose={closeInventory} onUseItem={handleUseItem} />
           </div>
         )}
 
