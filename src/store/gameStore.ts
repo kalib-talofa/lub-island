@@ -9,6 +9,7 @@ interface GameStore {
   eventsRemaining: number;  // 0-3
   eventsCompleted: number;
   isNight: boolean;
+  isIndoors: boolean;
   currentEventType: EventType | null;
 
   setPhase: (phase: GamePhase) => void;
@@ -18,6 +19,8 @@ interface GameStore {
   advanceDay: () => void;
   advanceToNight: () => void;
   advanceToCeremony: () => void;
+  enterVilla: () => void;
+  exitVilla: () => void;
   resetWeek: () => void;
   resetGame: () => void;
 }
@@ -29,6 +32,7 @@ export const useGameStore = create<GameStore>((set) => ({
   eventsRemaining: EVENTS_PER_DAY,
   eventsCompleted: 0,
   isNight: false,
+  isIndoors: false,
   currentEventType: null,
 
   setPhase: (phase) => set({ phase }),
@@ -55,7 +59,10 @@ export const useGameStore = create<GameStore>((set) => ({
 
   advanceToCeremony: () => set({ phase: 'CEREMONY', day: DAYS_PER_WEEK, currentEventType: null }),
 
-  resetWeek: () => set({ day: 1, week: 1, eventsRemaining: EVENTS_PER_DAY, eventsCompleted: 0, isNight: false, phase: 'MORNING_BRIEFING', currentEventType: null }),
+  enterVilla: () => set({ isIndoors: true }),
+  exitVilla: () => set({ isIndoors: false }),
 
-  resetGame: () => set({ phase: 'MAIN_MENU', day: 1, week: 1, eventsRemaining: EVENTS_PER_DAY, eventsCompleted: 0, isNight: false, currentEventType: null }),
+  resetWeek: () => set({ day: 1, week: 1, eventsRemaining: EVENTS_PER_DAY, eventsCompleted: 0, isNight: false, isIndoors: false, phase: 'MORNING_BRIEFING', currentEventType: null }),
+
+  resetGame: () => set({ phase: 'MAIN_MENU', day: 1, week: 1, eventsRemaining: EVENTS_PER_DAY, eventsCompleted: 0, isNight: false, isIndoors: false, currentEventType: null }),
 }));

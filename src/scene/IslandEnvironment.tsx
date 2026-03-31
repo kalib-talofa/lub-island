@@ -1,21 +1,19 @@
 "use client";
 
-import { useRef, useMemo, useState, useEffect } from "react";
+import { useRef, useMemo, Suspense } from "react";
 import * as THREE from "three";
 import { useFrame } from "@react-three/fiber";
-import { Instance, Instances } from "@react-three/drei";
+import { Instance, Instances, useTexture } from "@react-three/drei";
 
-// Loads a texture without crashing if the file is missing
-function useOptionalTexture(path: string, repeat: [number, number]): THREE.Texture | null {
-  const [texture, setTexture] = useState<THREE.Texture | null>(null);
-  useEffect(() => {
-    const loader = new THREE.TextureLoader();
-    loader.load(path, (tex) => {
-      tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-      tex.repeat.set(...repeat);
-      setTexture(tex);
-    });
-  }, [path]);
+// Wraps drei's useTexture and configures tiling/colorspace
+function useConfiguredTexture(path: string, repeat: [number, number]): THREE.Texture {
+  const texture = useTexture(path);
+  useMemo(() => {
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+    texture.repeat.set(repeat[0], repeat[1]);
+    texture.needsUpdate = true;
+  }, [texture]);
   return texture;
 }
 
@@ -103,13 +101,13 @@ function Rock({ position, scale = 1 }: { position: [number, number, number]; sca
 
 function Beach({ isNight }: { isNight: boolean }) {
   const sandColor = isNight ? "#A89060" : "#F4D68C";
-  const sandTexture = useOptionalTexture("/textures/Sand.png", [6, 3]);
+  const sandTexture = useConfiguredTexture("/textures/Sand.png", [6, 3]);
   return (
     <group position={[ZONE_POSITIONS.beach[0], ZONE_POSITIONS.beach[1], ZONE_POSITIONS.beach[2]]}>
       {/* Sand area */}
       <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]} scale={[18, 6, 1]}>
         <circleGeometry args={[1, 32]} />
-        <meshStandardMaterial color={sandColor} map={sandTexture ?? undefined} roughness={1} />
+        <meshStandardMaterial color={sandColor} map={sandTexture} roughness={1} />
       </mesh>
 
       {/* Beach chairs */}
@@ -186,43 +184,46 @@ function Beach({ isNight }: { isNight: boolean }) {
 function Villa({ isNight }: { isNight: boolean }) {
   const wallColor = isNight ? "#9B7548" : "#C89660";
   const roofColor = isNight ? "#7A3020" : "#A0522D";
+  const roofTexture = useConfiguredTexture("/textures/RoofColor.png", [2, 2]);
+  const wallTexture = useConfiguredTexture("/textures/WoodPanel.png", [2, 2]);
+  const porchTexture = useConfiguredTexture("/textures/WoodPanelLong.png", [4, 1]);
   return (
     <group position={[ZONE_POSITIONS.villa[0], ZONE_POSITIONS.villa[1], ZONE_POSITIONS.villa[2]]}>
       {/* Main hall */}
       <mesh castShadow receiveShadow position={[0, 1.5, 0]}>
         <boxGeometry args={[6, 3, 5]} />
-        <meshStandardMaterial color={wallColor} roughness={0.8} />
+        <meshStandardMaterial color={wallColor} map={wallTexture} roughness={0.8} />
       </mesh>
       {/* Roof */}
       <mesh castShadow position={[0, 3.3, 0]} rotation={[0, Math.PI / 4, 0]}>
         <coneGeometry args={[5, 1.6, 4]} />
-        <meshStandardMaterial color={roofColor} roughness={0.85} />
+        <meshStandardMaterial color={roofColor} map={roofTexture} roughness={0.85} />
       </mesh>
 
       {/* Left wing room */}
       <mesh castShadow receiveShadow position={[-4.5, 1.0, 0]}>
         <boxGeometry args={[3, 2, 3.5]} />
-        <meshStandardMaterial color={wallColor} roughness={0.8} />
+        <meshStandardMaterial color={wallColor} map={wallTexture} roughness={0.8} />
       </mesh>
       <mesh castShadow position={[-4.5, 2.25, 0]} rotation={[0, 0, 0]}>
         <coneGeometry args={[2.8, 1.0, 4]} />
-        <meshStandardMaterial color={roofColor} roughness={0.85} />
+        <meshStandardMaterial color={roofColor} map={roofTexture} roughness={0.85} />
       </mesh>
 
       {/* Right wing room */}
       <mesh castShadow receiveShadow position={[4.5, 1.0, 0]}>
         <boxGeometry args={[3, 2, 3.5]} />
-        <meshStandardMaterial color={wallColor} roughness={0.8} />
+        <meshStandardMaterial color={wallColor} map={wallTexture} roughness={0.8} />
       </mesh>
       <mesh castShadow position={[4.5, 2.25, 0]} rotation={[0, 0, 0]}>
         <coneGeometry args={[2.8, 1.0, 4]} />
-        <meshStandardMaterial color={roofColor} roughness={0.85} />
+        <meshStandardMaterial color={roofColor} map={roofTexture} roughness={0.85} />
       </mesh>
 
       {/* Porch / deck area (front) */}
       <mesh receiveShadow position={[0, 0.08, 3.5]} rotation={[-Math.PI / 2, 0, 0]}>
         <boxGeometry args={[8, 3, 0.15]} />
-        <meshStandardMaterial color="#B8860B" roughness={0.9} />
+        <meshStandardMaterial color="#B8860B" map={porchTexture} roughness={0.9} />
       </mesh>
       {/* Porch pillars */}
       {[-3.5, -1.2, 1.2, 3.5].map((x, i) => (
@@ -234,7 +235,7 @@ function Villa({ isNight }: { isNight: boolean }) {
       {/* Porch roof beam */}
       <mesh position={[0, 2.0, 4.8]}>
         <boxGeometry args={[8, 0.15, 0.3]} />
-        <meshStandardMaterial color={roofColor} roughness={0.85} />
+        <meshStandardMaterial color={roofColor} map={roofTexture} roughness={0.85} />
       </mesh>
 
       {/* Door */}
@@ -343,12 +344,13 @@ function Garden({ isNight }: { isNight: boolean }) {
 
 function ChallengeArena({ isNight }: { isNight: boolean }) {
   const markerColor = isNight ? "#CC6600" : "#FF8C00";
+  const gravelTexture = useConfiguredTexture("/textures/GravelRock.png", [5, 5]);
   return (
     <group position={[ZONE_POSITIONS.arena[0], ZONE_POSITIONS.arena[1], ZONE_POSITIONS.arena[2]]}>
       {/* Arena floor */}
       <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]}>
         <circleGeometry args={[7, 32]} />
-        <meshStandardMaterial color={isNight ? "#8B7355" : "#C4A66A"} roughness={0.95} />
+        <meshStandardMaterial color={isNight ? "#8B7355" : "#C4A66A"} map={gravelTexture} roughness={0.95} />
       </mesh>
 
       {/* Inner ring marking */}
@@ -379,7 +381,7 @@ function ChallengeArena({ isNight }: { isNight: boolean }) {
       {/* Center podium */}
       <mesh position={[0, 0.2, 0]}>
         <cylinderGeometry args={[1.0, 1.2, 0.4, 12]} />
-        <meshStandardMaterial color="#808080" roughness={0.7} />
+        <meshStandardMaterial color="#808080" map={gravelTexture} roughness={0.7} />
       </mesh>
     </group>
   );
@@ -438,13 +440,15 @@ function JungleTrail({ isNight }: { isNight: boolean }) {
 
 function Dock({ isNight }: { isNight: boolean }) {
   const woodColor = isNight ? "#6B5030" : "#9B7653";
+  const plankTexture = useConfiguredTexture("/textures/WoodPanelLong.png", [1, 1]);
+  const railTexture = useConfiguredTexture("/textures/WoodPanelSimple.png", [1, 1]);
   return (
     <group position={[ZONE_POSITIONS.dock[0], ZONE_POSITIONS.dock[1], ZONE_POSITIONS.dock[2]]}>
       {/* Pier planks */}
       {Array.from({ length: 8 }).map((_, i) => (
         <mesh key={`plank-${i}`} position={[0, 0.4, i * 1.2]}>
           <boxGeometry args={[2.0, 0.12, 1.0]} />
-          <meshStandardMaterial color={woodColor} roughness={0.9} />
+          <meshStandardMaterial color={woodColor} map={plankTexture} roughness={0.9} />
         </mesh>
       ))}
 
@@ -467,11 +471,11 @@ function Dock({ isNight }: { isNight: boolean }) {
         <group key={`rail-${i}`}>
           <mesh position={[-0.9, 0.9, i * 2.2]}>
             <cylinderGeometry args={[0.05, 0.05, 1.0, 4]} />
-            <meshStandardMaterial color={woodColor} roughness={0.85} />
+            <meshStandardMaterial color={woodColor} map={railTexture} roughness={0.85} />
           </mesh>
           <mesh position={[0.9, 0.9, i * 2.2]}>
             <cylinderGeometry args={[0.05, 0.05, 1.0, 4]} />
-            <meshStandardMaterial color={woodColor} roughness={0.85} />
+            <meshStandardMaterial color={woodColor} map={railTexture} roughness={0.85} />
           </mesh>
         </group>
       ))}
@@ -479,11 +483,11 @@ function Dock({ isNight }: { isNight: boolean }) {
       {/* Top rails */}
       <mesh position={[-0.9, 1.35, 4.5]}>
         <boxGeometry args={[0.08, 0.08, 9.5]} />
-        <meshStandardMaterial color={woodColor} roughness={0.85} />
+        <meshStandardMaterial color={woodColor} map={railTexture} roughness={0.85} />
       </mesh>
       <mesh position={[0.9, 1.35, 4.5]}>
         <boxGeometry args={[0.08, 0.08, 9.5]} />
-        <meshStandardMaterial color={woodColor} roughness={0.85} />
+        <meshStandardMaterial color={woodColor} map={railTexture} roughness={0.85} />
       </mesh>
 
       {/* Mooring post at the end */}
@@ -496,18 +500,20 @@ function Dock({ isNight }: { isNight: boolean }) {
 }
 
 function LookoutPoint({ isNight }: { isNight: boolean }) {
+  const gravelTexture = useConfiguredTexture("/textures/GravelRock.png", [3, 3]);
+  const platformTexture = useConfiguredTexture("/textures/WoodPanelSimple.png", [2, 2]);
   return (
     <group position={[ZONE_POSITIONS.lookout[0], ZONE_POSITIONS.lookout[1], ZONE_POSITIONS.lookout[2]]}>
       {/* Elevated mound */}
       <mesh position={[0, -0.2, 0]} scale={[3, 1.5, 3]}>
         <sphereGeometry args={[1.2, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2]} />
-        <meshStandardMaterial color={isNight ? "#3A6B2A" : "#4A8B3A"} roughness={0.95} />
+        <meshStandardMaterial color={isNight ? "#3A6B2A" : "#4A8B3A"} map={gravelTexture} roughness={0.95} />
       </mesh>
 
       {/* Flat top platform */}
       <mesh position={[0, 1.3, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <circleGeometry args={[1.8, 12]} />
-        <meshStandardMaterial color={isNight ? "#6B5030" : "#9B7653"} roughness={0.9} />
+        <meshStandardMaterial color={isNight ? "#6B5030" : "#9B7653"} map={platformTexture} roughness={0.9} />
       </mesh>
 
       {/* Railing around the top */}
@@ -721,29 +727,29 @@ function WaterPlane({ isNight }: { isNight: boolean }) {
 
 function IslandGround({ isNight }: { isNight: boolean }) {
   const groundColor = isNight ? "#1E5C1E" : "#3CB043";
-  const grassTexture = useOptionalTexture("/textures/Grass.png", [8, 8]);
+  const grassTexture = useConfiguredTexture("/textures/Grass.png", [8, 8]);
 
   return (
     <group>
       {/* Main island - slightly irregular via overlapping ellipses */}
       <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]}>
         <circleGeometry args={[20, 48]} />
-        <meshStandardMaterial color={groundColor} map={grassTexture ?? undefined} roughness={0.95} />
+        <meshStandardMaterial color={groundColor} map={grassTexture} roughness={0.95} />
       </mesh>
       {/* Slight extension north */}
       <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, -6]} scale={[14, 10, 1]}>
         <circleGeometry args={[1, 32]} />
-        <meshStandardMaterial color={groundColor} map={grassTexture ?? undefined} roughness={0.95} />
+        <meshStandardMaterial color={groundColor} map={grassTexture} roughness={0.95} />
       </mesh>
       {/* Slight extension south-east for dock area */}
       <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[8, 0, 10]} scale={[10, 8, 1]}>
         <circleGeometry args={[1, 24]} />
-        <meshStandardMaterial color={groundColor} map={grassTexture ?? undefined} roughness={0.95} />
+        <meshStandardMaterial color={groundColor} map={grassTexture} roughness={0.95} />
       </mesh>
       {/* Slight extension south for beach */}
       <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 10]} scale={[15, 9, 1]}>
         <circleGeometry args={[1, 28]} />
-        <meshStandardMaterial color={groundColor} map={grassTexture ?? undefined} roughness={0.95} />
+        <meshStandardMaterial color={groundColor} map={grassTexture} roughness={0.95} />
       </mesh>
     </group>
   );
@@ -763,17 +769,19 @@ export default function IslandEnvironment({ isNight }: IslandEnvironmentProps) {
       {/* Water (large plane under everything) */}
       <WaterPlane isNight={isNight} />
 
-      {/* Island ground */}
-      <IslandGround isNight={isNight} />
+      {/* Textured zones — Suspense handles texture loading; scene appears once all are ready */}
+      <Suspense fallback={null}>
+        <IslandGround isNight={isNight} />
+        <Beach isNight={isNight} />
+        <Villa isNight={isNight} />
+        <ChallengeArena isNight={isNight} />
+        <Dock isNight={isNight} />
+        <LookoutPoint isNight={isNight} />
+      </Suspense>
 
-      {/* Zones */}
-      <Beach isNight={isNight} />
-      <Villa isNight={isNight} />
+      {/* Non-textured zones */}
       <Garden isNight={isNight} />
-      <ChallengeArena isNight={isNight} />
       <JungleTrail isNight={isNight} />
-      <Dock isNight={isNight} />
-      <LookoutPoint isNight={isNight} />
 
       {/* Scattered environment details */}
       <ScatteredRocks />

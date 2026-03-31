@@ -16,6 +16,8 @@ import { GameEvent, ItemDef } from '@/characters/CharacterData';
 import { getRelationshipReward } from '@/systems/challenge';
 import { generateNightlyDrops, DroppedItem } from '@/systems/items';
 import { ZONE_POSITIONS } from '@/scene/IslandEnvironment';
+import { playerPositionRef } from '@/scene/PlayerController';
+import { npcPositionsRef } from '@/scene/NPCController';
 
 // All the state the game loop manages
 export interface GameLoopState {
@@ -395,15 +397,31 @@ export function useGameLoop() {
       setState(s => ({ ...s, showChallengeUI: true }));
     } else if (event.type === 'date') {
       const npc = activeCast.find(c => event.involvedNPCs.includes(c.id));
+      const dateNpc = npc || activeCast[0];
+      // Teleport the player next to the date NPC
+      if (dateNpc) {
+        const npcPos = npcPositionsRef.current[dateNpc.id];
+        if (npcPos) {
+          playerPositionRef.current.set(npcPos[0] + 1.5, 0, npcPos[2]);
+        }
+      }
       setState(s => ({
         ...s,
         showDateUI: true,
-        dateNPCId: npc?.id || activeCast[0]?.id || '',
-        dateNPCName: npc?.name || activeCast[0]?.name || 'Someone',
+        dateNPCId: dateNpc?.id || '',
+        dateNPCName: dateNpc?.name || 'Someone',
       }));
     } else {
       const npc = activeCast.find(c => event.involvedNPCs.includes(c.id));
-      if (npc) handleNPCInteract(npc.id);
+      if (npc) {
+        // Teleport the player next to the NPC before starting the dialogue
+        const npcPos = npcPositionsRef.current[npc.id];
+        if (npcPos) {
+          const offsetX = 1.5; // stand slightly to the side
+          playerPositionRef.current.set(npcPos[0] + offsetX, 0, npcPos[2]);
+        }
+        handleNPCInteract(npc.id);
+      }
       setTimeout(() => {
         gameStore.completeEvent();
         setState(s => ({ ...s, currentEvent: null }));
