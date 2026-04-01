@@ -106,6 +106,7 @@ On each non-ceremony day, 3 events are generated. The first event slot follows t
 - **Week 1, Day 1:** Fixed intro sequence: "Welcome to the Island", "A Fresh Face", "New Arrival" (all `arrival` type, always in this order).
 - **Days 2 & 4:** First event is always a `challenge`.
 - **Days 3 & 5:** First event is always a `date`.
+- **Day 6:** First event is always a `drama`.
 - **Other non-ceremony days:** The first event matches the day's headline type (e.g., `challenge` on challenge day). On `free` days, the headline is randomly chosen from available types.
 
 Remaining event slots (2nd and 3rd) are filled randomly from available types.
@@ -444,9 +445,19 @@ Group social events with 2 randomly selected NPCs. Costs 15 energy (`SOCIAL_EVEN
 
 **Social Locations:** Villa, Beach, Garden
 
-### 10d. Drama Events (Day 5)
+### 10d. Drama Events (Guaranteed on Day 6)
 
-Conflict/revelation events. Same energy cost as social (15). Currently use the same dialogue system as social events but with drama-themed titles and descriptions.
+Conflict/revelation events with higher-stakes relationship outcomes. Same energy cost as social (15). Drama events use dedicated `DRAMA_DIALOGUES` scripts (one per NPC) featuring confrontations, secrets, and vulnerable moments.
+
+**Drama Scenarios (per NPC):**
+- **Rosie:** A rumor about love letters is spreading -- defend or doubt her.
+- **Blaze:** Confronts the player about playing the field -- tests loyalty.
+- **Pudge:** Overheard Blaze calling him "dead weight" -- comfort or crush him.
+- **Kiki:** Reveals she caught someone snooping -- tests the player's moral compass.
+- **Sprocket:** Drops the comedy act for a vulnerable moment about identity.
+- **Lily:** Caught between Blaze and Rosie's argument -- asks the player to help navigate.
+
+**Relationship Effects:** Choices have larger swings than social events: +10 to +15 for empathetic/charm-gated responses, -3 to -8 for dismissive ones. Charm-gated options (typically 40-50 charm) unlock the best outcomes.
 
 **Drama Locations:** Villa, Jungle
 
@@ -617,7 +628,7 @@ The following features are referenced in the design or partially stubbed but not
 
 1. **New Arrivals (AI-Generated):** Day 1 "arrival" events exist in the weekly schedule, but new characters are not yet dynamically generated. The system supports an AI character generation route (`/api/ai/character`), but it does not produce new cast members during gameplay.
 
-2. **Producer Drama Events:** The Producer's Phone item and `handleProducerPhone` callback exist and the phone can be found in-world, but full producer-driven drama (rigging events, forcing dates, creating twists) is only partially working. Currently the phone shows a confirmation popup but does not fully alter the next day's schedule.
+2. **~~Producer's Phone:~~** *(Implemented)* The Producer's Phone stores the player's event type choice and injects it into the next day's event pool (slot 2 or 3, never overriding the guaranteed slot 1). Available choices: Challenge, Date, Social, Drama.
 
 3. **Player Bio Generation:** The player character has a basic backstory but there is no system for the player to customize their bio, personality, or appearance.
 

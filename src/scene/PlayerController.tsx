@@ -130,7 +130,6 @@ const STRUCTURE_COLLIDERS: CircleCollider[] = [
 
   // ---- Rocks ----
   { cx: -16, cz: 10, radius: 0.5 },
-  { cx: 17, cz: 5, radius: 0.4 },
   { cx: -12, cz: 14, radius: 0.35 },
 ];
 
@@ -144,6 +143,57 @@ function collidesWithStructure(x: number, z: number, playerRadius: number): bool
     }
   }
   return false;
+}
+
+/**
+ * Resolve movement against a list of circle colliders using normal-based sliding.
+ * Finds the deepest-penetrating collider, projects the movement onto its tangent,
+ * and returns a slide position — preventing corner-sticking.
+ */
+function resolveSlide(
+  cx: number, cz: number,
+  nx: number, nz: number,
+  playerRadius: number,
+  colliders: CircleCollider[],
+): { x: number; z: number } {
+  // Find the deepest-penetrating collider at the desired position
+  let hit: CircleCollider | null = null;
+  let deepest = -1;
+  for (const c of colliders) {
+    const dx = nx - c.cx;
+    const dz = nz - c.cz;
+    const minDist = c.radius + playerRadius;
+    const dist = Math.sqrt(dx * dx + dz * dz);
+    if (dist < minDist) {
+      const pen = minDist - dist;
+      if (pen > deepest) { deepest = pen; hit = c; }
+    }
+  }
+  if (!hit) return { x: nx, z: nz }; // no collision — full movement clear
+
+  // Collision normal: direction from collider center to the player's current position
+  let normalX = cx - hit.cx;
+  let normalZ = cz - hit.cz;
+  const len = Math.sqrt(normalX * normalX + normalZ * normalZ);
+  if (len < 0.001) return { x: cx, z: cz }; // degenerate (inside collider centre)
+  normalX /= len;
+  normalZ /= len;
+
+  // Project movement onto tangent (remove the component into the wall)
+  const moveX = nx - cx;
+  const moveZ = nz - cz;
+  const dot = moveX * normalX + moveZ * normalZ;
+  const slideX = cx + (moveX - dot * normalX);
+  const slideZ = cz + (moveZ - dot * normalZ);
+
+  // Accept slide if clear of all colliders
+  for (const c of colliders) {
+    const dx = slideX - c.cx;
+    const dz = slideZ - c.cz;
+    const minDist = c.radius + playerRadius;
+    if (dx * dx + dz * dz < minDist * minDist) return { x: cx, z: cz }; // cornered — stop
+  }
+  return { x: slideX, z: slideZ };
 }
 
 // ---------------------------------------------------------------------------
@@ -208,6 +258,31 @@ function isAtVillaDoorOutside(x: number, z: number): boolean {
 // ---------------------------------------------------------------------------
 
 const ISLAND_RADIUS = 20;
+
+/** Check if a position is within the walkable island area.
+ *  This is the main circle (radius 20) PLUS the beach/dock extensions to the south. */
+function isWithinIsland(x: number, z: number): boolean {
+  // Main island circle
+  if (x * x + z * z < ISLAND_RADIUS * ISLAND_RADIUS) return true;
+  // Beach sand — ellipse centered at (0, 16), semi-axes 18 x 6
+  const sx = x / 18;
+  const sz = (z - 16) / 6;
+  if (sx * sx + sz * sz < 1) return true;
+  // Beach/south grass extension — ellipse centered at (0, 10), semi-axes ~15 x 9
+  const bx = x / 15;
+  const bz = (z - 10) / 9;
+  if (bx * bx + bz * bz < 1) return true;
+  // Dock/southeast extension — ellipse centered at (8, 10), semi-axes ~10 x 8
+  const dx = (x - 8) / 10;
+  const dz = (z - 10) / 8;
+  if (dx * dx + dz * dz < 1) return true;
+  // North extension — ellipse centered at (0, -6), semi-axes ~14 x 10
+  const nx = x / 14;
+  const nz = (z + 6) / 10;
+  if (nx * nx + nz * nz < 1) return true;
+  return false;
+}
+
 const BOB_SPEED = 10;
 const BOB_AMPLITUDE = 0.06;
 /** Isometric camera Y rotation (45 deg) used to convert joystick → world */
@@ -284,17 +359,17 @@ export default function PlayerController({
         const inRoom = withinRoom(nextX, nextZ, PLAYER.COLLISION_RADIUS);
         const hitsInterior = collidesWithInterior(nextX, nextZ, PLAYER.COLLISION_RADIUS);
 
-        if (inRoom && !hitsInterior) {
-          playerPositionRef.current.x = nextX;
-          playerPositionRef.current.z = nextZ;
-        } else if (inRoom) {
-          // Sliding
-          if (!collidesWithInterior(nextX, playerPositionRef.current.z, PLAYER.COLLISION_RADIUS)
-              && withinRoom(nextX, playerPositionRef.current.z, PLAYER.COLLISION_RADIUS)) {
-            playerPositionRef.current.x = nextX;
-          } else if (!collidesWithInterior(playerPositionRef.current.x, nextZ, PLAYER.COLLISION_RADIUS)
-              && withinRoom(playerPositionRef.current.x, nextZ, PLAYER.COLLISION_RADIUS)) {
-            playerPositionRef.current.z = nextZ;
+        if (inRoom) {
+          const resolved = resolveSlide(
+            playerPositionRef.current.x, playerPositionRef.current.z,
+            nextX, nextZ,
+            PLAYER.COLLISION_RADIUS,
+            INTERIOR_COLLIDERS,
+          );
+          // Also clamp to room bounds after sliding
+          if (withinRoom(resolved.x, resolved.z, PLAYER.COLLISION_RADIUS)) {
+            playerPositionRef.current.x = resolved.x;
+            playerPositionRef.current.z = resolved.z;
           }
         }
 
@@ -323,8 +398,7 @@ export default function PlayerController({
         }
       } else {
         // ---- OUTDOOR movement (island) ----
-        const distSq = nextX * nextX + nextZ * nextZ;
-        const withinIslandBounds = distSq < ISLAND_RADIUS * ISLAND_RADIUS;
+        const withinIslandBounds = isWithinIsland(nextX, nextZ);
         const hitsStructure = collidesWithStructure(nextX, nextZ, PLAYER.COLLISION_RADIUS);
 
         // Check for villa door entry — modify collision near front door
@@ -339,16 +413,15 @@ export default function PlayerController({
             VILLA_INTERIOR.ENTRY_POSITION[2],
           );
           enterVilla();
-        } else if (withinIslandBounds && !hitsStructure) {
-          playerPositionRef.current.x = nextX;
-          playerPositionRef.current.z = nextZ;
         } else if (withinIslandBounds) {
-          // Try sliding along one axis at a time
-          if (!collidesWithStructure(nextX, playerPositionRef.current.z, PLAYER.COLLISION_RADIUS)) {
-            playerPositionRef.current.x = nextX;
-          } else if (!collidesWithStructure(playerPositionRef.current.x, nextZ, PLAYER.COLLISION_RADIUS)) {
-            playerPositionRef.current.z = nextZ;
-          }
+          const resolved = resolveSlide(
+            playerPositionRef.current.x, playerPositionRef.current.z,
+            nextX, nextZ,
+            PLAYER.COLLISION_RADIUS,
+            STRUCTURE_COLLIDERS,
+          );
+          playerPositionRef.current.x = resolved.x;
+          playerPositionRef.current.z = resolved.z;
         }
       }
 

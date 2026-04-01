@@ -82,10 +82,10 @@ function Beach({ isNight }: { isNight: boolean }) {
   const sandTexture = useConfiguredTexture("/textures/Sand.png", [6, 3]);
   return (
     <group position={[ZONE_POSITIONS.beach[0], ZONE_POSITIONS.beach[1], ZONE_POSITIONS.beach[2]]}>
-      {/* Sand area */}
-      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]} scale={[18, 6, 1]}>
+      {/* Sand area — raised above grass extensions and stronger polygonOffset */}
+      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]} scale={[18, 6, 1]}>
         <circleGeometry args={[1, 32]} />
-        <meshStandardMaterial color={sandColor} map={sandTexture} roughness={1} />
+        <meshStandardMaterial color={sandColor} map={sandTexture} roughness={1} polygonOffset polygonOffsetFactor={-6} polygonOffsetUnits={-6} />
       </mesh>
 
       {/* Beach chairs */}
@@ -244,10 +244,10 @@ function Garden({ isNight }: { isNight: boolean }) {
   const benchTexture = useConfiguredTexture("/textures/WoodPanelLong.png", [2, 1]);
   return (
     <group position={[ZONE_POSITIONS.garden[0], ZONE_POSITIONS.garden[1], ZONE_POSITIONS.garden[2]]}>
-      {/* Grassy patch — darker tint applied over grass texture */}
-      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]}>
+      {/* Grassy patch — darker tint, raised above base grass extensions */}
+      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.03, 0]}>
         <circleGeometry args={[6, 24]} />
-        <meshStandardMaterial color={isNight ? "#1A4A1A" : "#236B23"} map={grassTexture} roughness={1} />
+        <meshStandardMaterial color={isNight ? "#1A4A1A" : "#236B23"} map={grassTexture} roughness={1} polygonOffset polygonOffsetFactor={-6} polygonOffsetUnits={-6} />
       </mesh>
 
       {/* Fountain - central */}
@@ -328,10 +328,10 @@ function ChallengeArena({ isNight }: { isNight: boolean }) {
   const gravelTexture = useConfiguredTexture("/textures/GravelRock.png", [5, 5]);
   return (
     <group position={[ZONE_POSITIONS.arena[0], ZONE_POSITIONS.arena[1], ZONE_POSITIONS.arena[2]]}>
-      {/* Arena floor */}
-      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]}>
+      {/* Arena floor — raised above base grass extensions */}
+      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.03, 0]}>
         <circleGeometry args={[7, 32]} />
-        <meshStandardMaterial color={isNight ? "#8B7355" : "#C4A66A"} map={gravelTexture} roughness={0.95} />
+        <meshStandardMaterial color={isNight ? "#8B7355" : "#C4A66A"} map={gravelTexture} roughness={0.95} polygonOffset polygonOffsetFactor={-6} polygonOffsetUnits={-6} />
       </mesh>
 
       {/* Inner ring marking */}
@@ -677,16 +677,16 @@ function ScatteredRocks() {
 
 function WaterPlane({ isNight }: { isNight: boolean }) {
   const meshRef = useRef<THREE.Mesh>(null);
-  const waterTexture = useConfiguredTexture("/textures/Water.png", [20, 20]);
+  const waterTexture = useConfiguredTexture("/textures/Water.png", [8, 8]);
 
   useFrame(({ clock }) => {
     const t = clock.getElapsedTime();
     if (meshRef.current) {
       meshRef.current.position.y = -0.15 + Math.sin(t * 0.5) * 0.05;
     }
-    // Slowly scroll UVs for a moving water effect
-    waterTexture.offset.x = t * 0.01;
-    waterTexture.offset.y = t * 0.008;
+    // Scroll UVs diagonally for a gentle ocean current effect
+    waterTexture.offset.x = t * 0.035;
+    waterTexture.offset.y = t * 0.018;
   });
 
   return (
@@ -714,25 +714,27 @@ function IslandGround({ isNight }: { isNight: boolean }) {
 
   return (
     <group>
-      {/* Main island - slightly irregular via overlapping ellipses */}
+      {/* Main island - slightly irregular via overlapping ellipses.
+          Each layer gets a tiny Y bump + stronger polygonOffset so they
+          stack cleanly without z-fighting even where extensions overlap. */}
       <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]}>
         <circleGeometry args={[20, 48]} />
         <meshStandardMaterial color={groundColor} map={grassTexture} roughness={0.95} />
       </mesh>
       {/* Slight extension north */}
-      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, -6]} scale={[14, 10, 1]}>
+      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.005, -6]} scale={[14, 10, 1]}>
         <circleGeometry args={[1, 32]} />
-        <meshStandardMaterial color={groundColor} map={grassTexture} roughness={0.95} />
+        <meshStandardMaterial color={groundColor} map={grassTexture} roughness={0.95} polygonOffset polygonOffsetFactor={-2} polygonOffsetUnits={-2} />
       </mesh>
       {/* Slight extension south-east for dock area */}
-      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[8, 0, 10]} scale={[10, 8, 1]}>
+      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[8, 0.006, 10]} scale={[10, 8, 1]}>
         <circleGeometry args={[1, 24]} />
-        <meshStandardMaterial color={groundColor} map={grassTexture} roughness={0.95} />
+        <meshStandardMaterial color={groundColor} map={grassTexture} roughness={0.95} polygonOffset polygonOffsetFactor={-3} polygonOffsetUnits={-3} />
       </mesh>
       {/* Slight extension south for beach */}
-      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 10]} scale={[15, 9, 1]}>
+      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.007, 10]} scale={[15, 9, 1]}>
         <circleGeometry args={[1, 28]} />
-        <meshStandardMaterial color={groundColor} map={grassTexture} roughness={0.95} />
+        <meshStandardMaterial color={groundColor} map={grassTexture} roughness={0.95} polygonOffset polygonOffsetFactor={-4} polygonOffsetUnits={-4} />
       </mesh>
     </group>
   );

@@ -1,4 +1,5 @@
 import { DialogueScript } from '@/utils/ink';
+import { DAILY_DIALOGUES } from './daily';
 
 // ---------------------------------------------------------------------------
 // ROSIE -- The pun-loving rabbit, romantic interest
@@ -24,17 +25,17 @@ const rosie_chat_low: DialogueScript = {
           condition: (v) => v.charm >= 40,
           lockMessage: 'Needs 40 charm to land a counter-pun.',
           next: 'smooth_reply',
-          effects: { relationship: 8 },
+          effects: { relationship_level: 8 },
         },
         {
           text: '"Puns are the highest form of comedy. Fight me."',
           next: 'friendly_reply',
-          effects: { relationship: 5 },
+          effects: { relationship_level: 5 },
         },
         {
           text: '"I have no idea how to respond to that."',
           next: 'awkward_reply',
-          effects: { relationship: 2 },
+          effects: { relationship_level: 2 },
         },
       ],
     },
@@ -64,12 +65,12 @@ const rosie_chat_low: DialogueScript = {
         {
           text: '"What are you growing?"',
           next: 'growing',
-          effects: { relationship: 3 },
+          effects: { relationship_level: 3 },
         },
         {
           text: '"Nervous about being on the island?"',
           next: 'nervous',
-          effects: { relationship: 4 },
+          effects: { relationship_level: 4 },
         },
       ],
     },
@@ -113,17 +114,17 @@ const rosie_chat_mid: DialogueScript = {
           condition: (v) => v.charm >= 55,
           lockMessage: 'Needs 55 charm for the flirty deflection.',
           next: 'flirty_response',
-          effects: { relationship: 10 },
+          effects: { relationship_level: 10 },
         },
         {
           text: '"Carrot cake AND good company? Best day on the island so far."',
           next: 'warm_response',
-          effects: { relationship: 7 },
+          effects: { relationship_level: 7 },
         },
         {
           text: '"Thanks, I love cake."',
           next: 'plain_response',
-          effects: { relationship: 3 },
+          effects: { relationship_level: 3 },
         },
       ],
     },
@@ -153,19 +154,19 @@ const rosie_chat_mid: DialogueScript = {
         {
           text: '"What were you afraid of?"',
           next: 'fear_talk',
-          effects: { relationship: 6 },
+          effects: { relationship_level: 6 },
         },
         {
           text: '"You seem pretty brave to me."',
           condition: (v) => v.charm >= 45,
           lockMessage: 'Needs 45 charm to be reassuring.',
           next: 'brave_talk',
-          effects: { relationship: 8 },
+          effects: { relationship_level: 8 },
         },
         {
           text: '"That takes guts. I respect it."',
           next: 'respect_talk',
-          effects: { relationship: 5 },
+          effects: { relationship_level: 5 },
         },
       ],
     },
@@ -215,17 +216,17 @@ const rosie_chat_high: DialogueScript = {
           condition: (v) => v.charm >= 65,
           lockMessage: 'Needs 65 charm for this heartfelt response.',
           next: 'romantic_show',
-          effects: { relationship: 12 },
+          effects: { relationship_level: 12 },
         },
         {
           text: '"That is amazing! All that work paid off."',
           next: 'happy_show',
-          effects: { relationship: 7 },
+          effects: { relationship_level: 7 },
         },
         {
           text: '"Nice! Flowers are cool."',
           next: 'flat_show',
-          effects: { relationship: 3 },
+          effects: { relationship_level: 3 },
         },
       ],
     },
@@ -257,12 +258,12 @@ const rosie_chat_high: DialogueScript = {
           condition: (v) => v.charm >= 70,
           lockMessage: 'Needs 70 charm for the big romantic move.',
           next: 'love_letter',
-          effects: { relationship: 15 },
+          effects: { relationship_level: 15 },
         },
         {
           text: '"That means a lot, Rosie."',
           next: 'sweet_end',
-          effects: { relationship: 8 },
+          effects: { relationship_level: 8 },
         },
       ],
     },
@@ -304,17 +305,17 @@ const blaze_chat_low: DialogueScript = {
           condition: (v) => v.charm >= 45,
           lockMessage: 'Needs 45 charm to trade verbal jabs with Blaze.',
           next: 'witty_comeback',
-          effects: { relationship: 6 },
+          effects: { relationship_level: 6 },
         },
         {
           text: '"Just being friendly. We\'re all in this together."',
           next: 'naive_response',
-          effects: { relationship: 2 },
+          effects: { relationship_level: 2 },
         },
         {
           text: '"I\'m not scared of you."',
           next: 'aggressive_response',
-          effects: { relationship: -3 },
+          effects: { relationship_level: -3 },
         },
       ],
     },
@@ -346,12 +347,12 @@ const blaze_chat_low: DialogueScript = {
           condition: (v) => v.charm >= 50,
           lockMessage: 'Needs 50 charm to challenge Blaze directly.',
           next: 'his_play',
-          effects: { relationship: 5 },
+          effects: { relationship_level: 5 },
         },
         {
           text: '"Why are you telling me this?"',
           next: 'why_tell',
-          effects: { relationship: 3 },
+          effects: { relationship_level: 3 },
         },
       ],
     },
@@ -395,17 +396,17 @@ const blaze_chat_mid: DialogueScript = {
           condition: (v) => v.charm >= 55,
           lockMessage: 'Needs 55 charm to read Blaze accurately.',
           next: 'respect_kiki',
-          effects: { relationship: 8 },
+          effects: { relationship_level: 8 },
         },
         {
           text: '"Sounds like you\'re overthinking this."',
           next: 'overthinking',
-          effects: { relationship: 3 },
+          effects: { relationship_level: 3 },
         },
         {
           text: '"Where do I fit in your little chess game?"',
           next: 'chess_game',
-          effects: { relationship: 5 },
+          effects: { relationship_level: 5 },
         },
       ],
     },
@@ -437,12 +438,12 @@ const blaze_chat_mid: DialogueScript = {
           condition: (v) => v.charm >= 50,
           lockMessage: 'Needs 50 charm to get through to him.',
           next: 'breakthrough',
-          effects: { relationship: 10 },
+          effects: { relationship_level: 10 },
         },
         {
           text: '"That sounds rough."',
           next: 'sympathy',
-          effects: { relationship: 5 },
+          effects: { relationship_level: 5 },
         },
       ],
     },
@@ -486,12 +487,12 @@ const blaze_chat_high: DialogueScript = {
           condition: (v) => v.charm >= 60,
           lockMessage: 'Needs 60 charm for the affectionate tease.',
           next: 'tease_response',
-          effects: { relationship: 10 },
+          effects: { relationship_level: 10 },
         },
         {
           text: '"I appreciate it, Blaze. Really."',
           next: 'sincere_response',
-          effects: { relationship: 7 },
+          effects: { relationship_level: 7 },
         },
       ],
     },
@@ -517,12 +518,12 @@ const blaze_chat_high: DialogueScript = {
           condition: (v) => v.charm >= 65,
           lockMessage: 'Needs 65 charm to reach Blaze on this level.',
           next: 'connections_real',
-          effects: { relationship: 12 },
+          effects: { relationship_level: 12 },
         },
         {
           text: '"Some things are worth holding onto."',
           next: 'worth_it',
-          effects: { relationship: 8 },
+          effects: { relationship_level: 8 },
         },
       ],
     },
@@ -570,17 +571,17 @@ const pudge_chat_low: DialogueScript = {
           condition: (v) => v.charm >= 35,
           lockMessage: 'Needs 35 charm to put Pudge at ease.',
           next: 'calming',
-          effects: { relationship: 8 },
+          effects: { relationship_level: 8 },
         },
         {
           text: '"No worries! I\'m not great at this either."',
           next: 'relatable',
-          effects: { relationship: 6 },
+          effects: { relationship_level: 6 },
         },
         {
           text: '"You seem nervous."',
           next: 'pointed_out',
-          effects: { relationship: 1 },
+          effects: { relationship_level: 1 },
         },
       ],
     },
@@ -610,14 +611,14 @@ const pudge_chat_low: DialogueScript = {
         {
           text: '"Can I try one? I bet they\'re incredible."',
           next: 'try_cake',
-          effects: { relationship: 7 },
+          effects: { relationship_level: 7 },
         },
         {
           text: '"You should give yourself more credit."',
           condition: (v) => v.charm >= 40,
           lockMessage: 'Needs 40 charm to be encouraging.',
           next: 'credit',
-          effects: { relationship: 8 },
+          effects: { relationship_level: 8 },
         },
       ],
     },
@@ -661,17 +662,17 @@ const pudge_chat_mid: DialogueScript = {
           condition: (v) => v.charm >= 50,
           lockMessage: 'Needs 50 charm to appreciate his passion.',
           next: 'open_up',
-          effects: { relationship: 10 },
+          effects: { relationship_level: 10 },
         },
         {
           text: '"Hand it over. My taste buds are ready."',
           next: 'eager_taste',
-          effects: { relationship: 6 },
+          effects: { relationship_level: 6 },
         },
         {
           text: '"Sounds... fancy."',
           next: 'uncertain',
-          effects: { relationship: 3 },
+          effects: { relationship_level: 3 },
         },
       ],
     },
@@ -703,12 +704,12 @@ const pudge_chat_mid: DialogueScript = {
           condition: (v) => v.charm >= 50,
           lockMessage: 'Needs 50 charm for the reassurance.',
           next: 'reassured',
-          effects: { relationship: 10 },
+          effects: { relationship_level: 10 },
         },
         {
           text: '"Confidence is overrated. Kindness is what matters."',
           next: 'kindness',
-          effects: { relationship: 7 },
+          effects: { relationship_level: 7 },
         },
       ],
     },
@@ -752,12 +753,12 @@ const pudge_chat_high: DialogueScript = {
           condition: (v) => v.charm >= 60,
           lockMessage: 'Needs 60 charm for the meaningful moment.',
           next: 'brave_moment',
-          effects: { relationship: 12 },
+          effects: { relationship_level: 12 },
         },
         {
           text: '"That\'s what friends are for."',
           next: 'friends',
-          effects: { relationship: 6 },
+          effects: { relationship_level: 6 },
         },
       ],
     },
@@ -783,12 +784,12 @@ const pudge_chat_high: DialogueScript = {
           condition: (v) => v.charm >= 65,
           lockMessage: 'Needs 65 charm to fully appreciate the gesture.',
           next: 'touched',
-          effects: { relationship: 15 },
+          effects: { relationship_level: 15 },
         },
         {
           text: '"Pudge... this is amazing."',
           next: 'amazed',
-          effects: { relationship: 10 },
+          effects: { relationship_level: 10 },
         },
       ],
     },
@@ -830,17 +831,17 @@ const kiki_chat_low: DialogueScript = {
           condition: (v) => v.charm >= 50,
           lockMessage: 'Needs 50 charm to intrigue Kiki.',
           next: 'intrigued',
-          effects: { relationship: 8 },
+          effects: { relationship_level: 8 },
         },
         {
           text: '"I\'m just saying hi."',
           next: 'casual_hi',
-          effects: { relationship: 2 },
+          effects: { relationship_level: 2 },
         },
         {
           text: '"Those cards real or just for show?"',
           next: 'cards_question',
-          effects: { relationship: 4 },
+          effects: { relationship_level: 4 },
         },
       ],
     },
@@ -870,14 +871,14 @@ const kiki_chat_low: DialogueScript = {
         {
           text: '"Sure. What do the cards say about me?"',
           next: 'card_reading',
-          effects: { relationship: 5 },
+          effects: { relationship_level: 5 },
         },
         {
           text: '"I\'d rather get to know the real you, not the cards."',
           condition: (v) => v.charm >= 55,
           lockMessage: 'Needs 55 charm to see past the mystique.',
           next: 'real_kiki',
-          effects: { relationship: 10 },
+          effects: { relationship_level: 10 },
         },
       ],
     },
@@ -921,19 +922,19 @@ const kiki_chat_mid: DialogueScript = {
           condition: (v) => v.charm >= 55,
           lockMessage: 'Needs 55 charm to turn the question around.',
           next: 'about_you',
-          effects: { relationship: 8 },
+          effects: { relationship_level: 8 },
         },
         {
           text: '"That\'s kind of harsh."',
           next: 'harsh',
-          effects: { relationship: 2 },
+          effects: { relationship_level: 2 },
         },
         {
           text: '"What about yourself? Have you figured you out?"',
           condition: (v) => v.charm >= 60,
           lockMessage: 'Needs 60 charm to challenge Kiki this directly.',
           next: 'about_herself',
-          effects: { relationship: 10 },
+          effects: { relationship_level: 10 },
         },
       ],
     },
@@ -965,12 +966,12 @@ const kiki_chat_mid: DialogueScript = {
           condition: (v) => v.charm >= 55,
           lockMessage: 'Needs 55 charm to offer genuine connection.',
           next: 'no_perform',
-          effects: { relationship: 10 },
+          effects: { relationship_level: 10 },
         },
         {
           text: '"That sounds lonely."',
           next: 'lonely',
-          effects: { relationship: 6 },
+          effects: { relationship_level: 6 },
         },
       ],
     },
@@ -1014,12 +1015,12 @@ const kiki_chat_high: DialogueScript = {
           condition: (v) => v.charm >= 65,
           lockMessage: 'Needs 65 charm to tease Kiki at this level.',
           next: 'tease_kiki',
-          effects: { relationship: 12 },
+          effects: { relationship_level: 12 },
         },
         {
           text: '"You held my attention too, Kiki."',
           next: 'mutual',
-          effects: { relationship: 8 },
+          effects: { relationship_level: 8 },
         },
       ],
     },
@@ -1051,12 +1052,12 @@ const kiki_chat_high: DialogueScript = {
           condition: (v) => v.charm >= 70,
           lockMessage: 'Needs 70 charm for this pivotal moment.',
           next: 'matters',
-          effects: { relationship: 15 },
+          effects: { relationship_level: 15 },
         },
         {
           text: '"You don\'t have to figure it all out tonight."',
           next: 'patient',
-          effects: { relationship: 8 },
+          effects: { relationship_level: 8 },
         },
       ],
     },
@@ -1098,17 +1099,17 @@ const sprocket_chat_low: DialogueScript = {
           condition: (v) => v.charm >= 40,
           lockMessage: 'Needs 40 charm to match his energy.',
           next: 'more_jokes',
-          effects: { relationship: 8 },
+          effects: { relationship_level: 8 },
         },
         {
           text: '*polite laugh*',
           next: 'polite_laugh',
-          effects: { relationship: 3 },
+          effects: { relationship_level: 3 },
         },
         {
           text: '"...Do you have any other material?"',
           next: 'other_material',
-          effects: { relationship: 1 },
+          effects: { relationship_level: 1 },
         },
       ],
     },
@@ -1140,12 +1141,12 @@ const sprocket_chat_low: DialogueScript = {
           condition: (v) => v.charm >= 45,
           lockMessage: 'Needs 45 charm to get past the jokes.',
           next: 'real_fear',
-          effects: { relationship: 8 },
+          effects: { relationship_level: 8 },
         },
         {
           text: '"I get that. Laughter is a good defense."',
           next: 'defense',
-          effects: { relationship: 5 },
+          effects: { relationship_level: 5 },
         },
       ],
     },
@@ -1189,17 +1190,17 @@ const sprocket_chat_mid: DialogueScript = {
           condition: (v) => v.charm >= 50,
           lockMessage: 'Needs 50 charm to give comedy advice.',
           next: 'comedy_advice',
-          effects: { relationship: 8 },
+          effects: { relationship_level: 8 },
         },
         {
           text: '"Maybe roast yourself instead. Self-deprecation is gold."',
           next: 'self_roast',
-          effects: { relationship: 5 },
+          effects: { relationship_level: 5 },
         },
         {
           text: '"Just keep doing your thing, Sprocket."',
           next: 'keep_going',
-          effects: { relationship: 4 },
+          effects: { relationship_level: 4 },
         },
       ],
     },
@@ -1231,12 +1232,12 @@ const sprocket_chat_mid: DialogueScript = {
           condition: (v) => v.charm >= 50,
           lockMessage: 'Needs 50 charm for the emotional support.',
           next: 'not_empty',
-          effects: { relationship: 10 },
+          effects: { relationship_level: 10 },
         },
         {
           text: '"Being loud isn\'t the same as being heard."',
           next: 'being_heard',
-          effects: { relationship: 7 },
+          effects: { relationship_level: 7 },
         },
       ],
     },
@@ -1280,12 +1281,12 @@ const sprocket_chat_high: DialogueScript = {
           condition: (v) => v.charm >= 60,
           lockMessage: 'Needs 60 charm for this level of sincerity.',
           next: 'promise',
-          effects: { relationship: 12 },
+          effects: { relationship_level: 12 },
         },
         {
           text: '"Real friends don\'t disappear when the cameras stop."',
           next: 'real_friends',
-          effects: { relationship: 8 },
+          effects: { relationship_level: 8 },
         },
       ],
     },
@@ -1311,12 +1312,12 @@ const sprocket_chat_high: DialogueScript = {
           condition: (v) => v.charm >= 65,
           lockMessage: 'Needs 65 charm for the pivotal friendship moment.',
           next: 'enough',
-          effects: { relationship: 15 },
+          effects: { relationship_level: 15 },
         },
         {
           text: '"You don\'t have to earn people\'s time with jokes."',
           next: 'earn',
-          effects: { relationship: 10 },
+          effects: { relationship_level: 10 },
         },
       ],
     },
@@ -1364,17 +1365,17 @@ const lily_chat_low: DialogueScript = {
           condition: (v) => v.charm >= 40,
           lockMessage: 'Needs 40 charm to connect with Lily on this.',
           next: 'meaningful',
-          effects: { relationship: 8 },
+          effects: { relationship_level: 8 },
         },
         {
           text: '"Is the fern going to make it?"',
           next: 'fern_update',
-          effects: { relationship: 5 },
+          effects: { relationship_level: 5 },
         },
         {
           text: '"Sprocket has a point, though."',
           next: 'point',
-          effects: { relationship: -2 },
+          effects: { relationship_level: -2 },
         },
       ],
     },
@@ -1404,14 +1405,14 @@ const lily_chat_low: DialogueScript = {
         {
           text: '"Show me sometime?"',
           next: 'show_me',
-          effects: { relationship: 6 },
+          effects: { relationship_level: 6 },
         },
         {
           text: '"Is the loudness hard for you?"',
           condition: (v) => v.charm >= 40,
           lockMessage: 'Needs 40 charm to ask about her comfort.',
           next: 'loudness',
-          effects: { relationship: 7 },
+          effects: { relationship_level: 7 },
         },
       ],
     },
@@ -1455,17 +1456,17 @@ const lily_chat_mid: DialogueScript = {
           condition: (v) => v.charm >= 50,
           lockMessage: 'Needs 50 charm for the nature humor.',
           next: 'nature_joke',
-          effects: { relationship: 8 },
+          effects: { relationship_level: 8 },
         },
         {
           text: '"Can I see the orchid drawing?"',
           next: 'orchid',
-          effects: { relationship: 6 },
+          effects: { relationship_level: 6 },
         },
         {
           text: '"Three journals? That\'s dedication."',
           next: 'dedication',
-          effects: { relationship: 4 },
+          effects: { relationship_level: 4 },
         },
       ],
     },
@@ -1497,12 +1498,12 @@ const lily_chat_mid: DialogueScript = {
           condition: (v) => v.charm >= 50,
           lockMessage: 'Needs 50 charm for the philosophical response.',
           next: 'faith',
-          effects: { relationship: 10 },
+          effects: { relationship_level: 10 },
         },
         {
           text: '"Has the island lived up to the fortune?"',
           next: 'lived_up',
-          effects: { relationship: 6 },
+          effects: { relationship_level: 6 },
         },
       ],
     },
@@ -1546,12 +1547,12 @@ const lily_chat_high: DialogueScript = {
           condition: (v) => v.charm >= 60,
           lockMessage: 'Needs 60 charm for the philosophical connection.',
           next: 'experienced',
-          effects: { relationship: 12 },
+          effects: { relationship_level: 12 },
         },
         {
           text: '"It\'s stunning. Thank you for sharing it with me."',
           next: 'sharing',
-          effects: { relationship: 8 },
+          effects: { relationship_level: 8 },
         },
       ],
     },
@@ -1577,12 +1578,12 @@ const lily_chat_high: DialogueScript = {
           condition: (v) => v.charm >= 70,
           lockMessage: 'Needs 70 charm for this heartfelt declaration.',
           next: 'home',
-          effects: { relationship: 15 },
+          effects: { relationship_level: 15 },
         },
         {
           text: '"Drifting isn\'t always bad. Some plants thrive on the current."',
           next: 'drifting',
-          effects: { relationship: 8 },
+          effects: { relationship_level: 8 },
         },
       ],
     },
@@ -1630,17 +1631,17 @@ const rosie_date: DialogueScript = {
           condition: (v) => v.charm >= 55,
           lockMessage: 'Needs 55 charm to be confidently endearing.',
           next: 'adorable',
-          effects: { relationship: 12 },
+          effects: { relationship_level: 12 },
         },
         {
           text: '"I rehearsed too, so we\'re even."',
           next: 'even',
-          effects: { relationship: 8 },
+          effects: { relationship_level: 8 },
         },
         {
           text: '"Let\'s eat. I\'m starving."',
           next: 'hungry',
-          effects: { relationship: 3 },
+          effects: { relationship_level: 3 },
         },
       ],
     },
@@ -1678,19 +1679,19 @@ const rosie_date: DialogueScript = {
           condition: (v) => v.charm >= 65,
           lockMessage: 'Needs 65 charm for the perfect answer.',
           next: 'perfect_answer',
-          effects: { relationship: 15 },
+          effects: { relationship_level: 15 },
         },
         {
           text: '"Because you make me laugh, and that matters more than impressive."',
           condition: (v) => v.charm >= 50,
           lockMessage: 'Needs 50 charm for the heartfelt answer.',
           next: 'laugh_answer',
-          effects: { relationship: 10 },
+          effects: { relationship_level: 10 },
         },
         {
           text: '"I like spending time with you. Simple as that."',
           next: 'simple_answer',
-          effects: { relationship: 6 },
+          effects: { relationship_level: 6 },
         },
       ],
     },
@@ -1740,12 +1741,12 @@ const kiki_date: DialogueScript = {
           condition: (v) => v.charm >= 55,
           lockMessage: 'Needs 55 charm for the confident humor.',
           next: 'charm_opener',
-          effects: { relationship: 10 },
+          effects: { relationship_level: 10 },
         },
         {
           text: '"This is beautiful. Do you always pick the best spots?"',
           next: 'nice_spot',
-          effects: { relationship: 6 },
+          effects: { relationship_level: 6 },
         },
       ],
     },
@@ -1771,12 +1772,12 @@ const kiki_date: DialogueScript = {
           condition: (v) => v.charm >= 65,
           lockMessage: 'Needs 65 charm for the poetic response.',
           next: 'poetic',
-          effects: { relationship: 12 },
+          effects: { relationship_level: 12 },
         },
         {
           text: '"What changed?"',
           next: 'what_changed',
-          effects: { relationship: 7 },
+          effects: { relationship_level: 7 },
         },
       ],
     },
@@ -1802,12 +1803,12 @@ const kiki_date: DialogueScript = {
           condition: (v) => v.charm >= 70,
           lockMessage: 'Needs 70 charm for this romantic gesture.',
           next: 'flip_card',
-          effects: { relationship: 15 },
+          effects: { relationship_level: 15 },
         },
         {
           text: '"You don\'t need cards to know what you want."',
           next: 'no_cards',
-          effects: { relationship: 8 },
+          effects: { relationship_level: 8 },
         },
       ],
     },
@@ -1832,6 +1833,320 @@ const kiki_date: DialogueScript = {
 };
 
 // ---------------------------------------------------------------------------
+// DRAMA DIALOGUES -- confrontations, secrets, and revelations
+// ---------------------------------------------------------------------------
+
+const rosie_drama: DialogueScript = {
+  id: 'rosie_drama',
+  startNode: 'start',
+  nodes: {
+    start: {
+      id: 'start',
+      speaker: 'Rosie',
+      text: "*fidgeting with her ears* So... I heard something. Someone told Blaze that I've been writing love letters to every islander. That's not true! I wrote ONE. And I never even sent it.",
+      next: 'react',
+    },
+    react: {
+      id: 'react',
+      speaker: 'Rosie',
+      text: "Now everyone's looking at me weird. I know it's silly to care, but... do you believe me?",
+      choices: [
+        {
+          text: '"Of course I believe you. Whoever spread that is just stirring trouble."',
+          next: 'defend',
+          effects: { relationship_level: 12 },
+        },
+        {
+          text: '"Even if you did write letters, so what? That takes courage."',
+          condition: (v) => v.charm >= 40,
+          lockMessage: 'Needs 40 charm for this reassurance.',
+          next: 'charm_defend',
+          effects: { relationship_level: 15 },
+        },
+        {
+          text: '"I mean... did you though? Write letters to everyone?"',
+          next: 'doubt',
+          effects: { relationship_level: -5 },
+        },
+      ],
+    },
+    defend: {
+      id: 'defend',
+      speaker: 'Rosie',
+      text: "*sniffles* Thank you. Really. I was starting to think nobody here would take my side. You're a good egg. ...Get it? Egg? Because-- okay, not the time for puns.",
+    },
+    charm_defend: {
+      id: 'charm_defend',
+      speaker: 'Rosie',
+      text: "*ears shoot straight up* That's... actually the nicest thing anyone's said to me on this island. You know what? I DID write that letter, and it was BEAUTIFUL. Let them talk!",
+    },
+    doubt: {
+      id: 'doubt',
+      speaker: 'Rosie',
+      text: "I-- wow. Okay. I thought we were closer than that. *turns away* I need to go water some plants or something.",
+    },
+  },
+};
+
+const blaze_drama: DialogueScript = {
+  id: 'blaze_drama',
+  startNode: 'start',
+  nodes: {
+    start: {
+      id: 'start',
+      speaker: 'Blaze',
+      text: "*blocks your path* We need to talk. I've been watching you work the island, chatting up everyone, keeping your options open. Sound familiar?",
+      next: 'accusation',
+    },
+    accusation: {
+      id: 'accusation',
+      speaker: 'Blaze',
+      text: "I respect the hustle. But some of the others? They actually think you're being genuine. So which is it -- are you playing the game, or playing the people?",
+      choices: [
+        {
+          text: '"I\'m being real with everyone. Not everything is a competition, Blaze."',
+          next: 'sincere',
+          effects: { relationship_level: 8 },
+        },
+        {
+          text: '"Takes one to know one, doesn\'t it?"',
+          condition: (v) => v.charm >= 50,
+          lockMessage: 'Needs 50 charm to call Blaze out.',
+          next: 'counter',
+          effects: { relationship_level: 12 },
+        },
+        {
+          text: '"Why do you care what I do?"',
+          next: 'deflect',
+          effects: { relationship_level: -3 },
+        },
+      ],
+    },
+    sincere: {
+      id: 'sincere',
+      speaker: 'Blaze',
+      text: "*narrows eyes* ...Hm. Either you're better at this than I thought, or you actually mean that. I can't tell yet. But I'll be watching.",
+    },
+    counter: {
+      id: 'counter',
+      speaker: 'Blaze',
+      text: "*laughs, genuinely surprised* Okay, OKAY. Fair hit. Maybe I've been projecting. You've got more fire than I gave you credit for. I like that.",
+    },
+    deflect: {
+      id: 'deflect',
+      speaker: 'Blaze',
+      text: "Because when someone gets hurt on this island, it makes everyone's game harder. This is a warning, not a threat. We clear?",
+    },
+  },
+};
+
+const pudge_drama: DialogueScript = {
+  id: 'pudge_drama',
+  startNode: 'start',
+  nodes: {
+    start: {
+      id: 'start',
+      speaker: 'Pudge',
+      text: "*sitting alone, staring at the ground* Oh... h-hey. I didn't think anyone would come over here.",
+      next: 'reveal',
+    },
+    reveal: {
+      id: 'reveal',
+      speaker: 'Pudge',
+      text: "I overheard Blaze telling Kiki that I'm... 'dead weight.' That I'm only still here because nobody sees me as a threat. Is that... is that what everyone thinks?",
+      choices: [
+        {
+          text: '"Pudge, you\'re one of the most genuine people here. That\'s worth more than being a threat."',
+          next: 'comfort',
+          effects: { relationship_level: 15 },
+        },
+        {
+          text: '"Blaze says that about everyone. Don\'t take it personally."',
+          next: 'dismiss',
+          effects: { relationship_level: 5 },
+        },
+        {
+          text: '"I mean... the competition IS tough. Maybe try putting yourself out there more?"',
+          next: 'harsh',
+          effects: { relationship_level: -8 },
+        },
+      ],
+    },
+    comfort: {
+      id: 'comfort',
+      speaker: 'Pudge',
+      text: "*eyes glistening* You... you really think so? I'm sorry, I just-- my friends signed me up for this and I keep wondering if I belong here. But maybe... maybe I do. Thank you.",
+    },
+    dismiss: {
+      id: 'dismiss',
+      speaker: 'Pudge',
+      text: "Yeah... you're probably right. Blaze is just being Blaze. I shouldn't let it get to me. *deep breath* Okay. I'm okay.",
+    },
+    harsh: {
+      id: 'harsh',
+      speaker: 'Pudge',
+      text: "*flinches* I-- yeah. I know. You're right. I'll try. I just... *trails off and goes quiet*",
+    },
+  },
+};
+
+const kiki_drama: DialogueScript = {
+  id: 'kiki_drama',
+  startNode: 'start',
+  nodes: {
+    start: {
+      id: 'start',
+      speaker: 'Kiki',
+      text: "*pulls you aside* I need to tell you something. And before you ask -- no, I don't do this for everyone.",
+      next: 'secret',
+    },
+    secret: {
+      id: 'secret',
+      speaker: 'Kiki',
+      text: "I saw something last night. One of the islanders sneaking around, going through someone else's things. I won't say who -- yet. But I want to know: if you found out someone here was hiding something big, would you expose them?",
+      choices: [
+        {
+          text: '"It depends on what they\'re hiding. Context matters."',
+          condition: (v) => v.charm >= 40,
+          lockMessage: 'Needs 40 charm for the nuanced take.',
+          next: 'nuanced',
+          effects: { relationship_level: 12 },
+        },
+        {
+          text: '"Everyone deserves to know the truth."',
+          next: 'expose',
+          effects: { relationship_level: 5 },
+        },
+        {
+          text: '"Not my business. I keep my head down."',
+          next: 'ignore',
+          effects: { relationship_level: -3 },
+        },
+      ],
+    },
+    nuanced: {
+      id: 'nuanced',
+      speaker: 'Kiki',
+      text: "*slow smile* Now THAT'S the right answer. Black and white thinking is boring. You and I might get along better than I expected. I'll keep you posted.",
+    },
+    expose: {
+      id: 'expose',
+      speaker: 'Kiki',
+      text: "Interesting. You're the righteous type. That can be useful... or dangerous. Either way, I'll remember you said that.",
+    },
+    ignore: {
+      id: 'ignore',
+      speaker: 'Kiki',
+      text: "*disappointed look* And here I thought you were interesting. Fine. I'll handle it myself. I always do.",
+    },
+  },
+};
+
+const sprocket_drama: DialogueScript = {
+  id: 'sprocket_drama',
+  startNode: 'start',
+  nodes: {
+    start: {
+      id: 'start',
+      speaker: 'Sprocket',
+      text: "*not making eye contact* Hey. Can I, uh... can I talk to you for a second? No jokes this time. I promise.",
+      next: 'serious',
+    },
+    serious: {
+      id: 'serious',
+      speaker: 'Sprocket',
+      text: "Everyone here sees me as the funny one. The class clown. And that's fine, that's my thing. But... sometimes I wonder if anyone actually wants to know the real me. Or if they just want the next punchline.",
+      choices: [
+        {
+          text: '"I want to know the real you. Jokes and all, but especially the parts in between."',
+          condition: (v) => v.charm >= 40,
+          lockMessage: 'Needs 40 charm to reach Sprocket here.',
+          next: 'real',
+          effects: { relationship_level: 15 },
+        },
+        {
+          text: '"Being funny is a gift, Sprocket. Don\'t sell yourself short."',
+          next: 'encourage',
+          effects: { relationship_level: 8 },
+        },
+        {
+          text: '"Dude, you\'re overthinking it. Everyone loves you."',
+          next: 'brush_off',
+          effects: { relationship_level: -3 },
+        },
+      ],
+    },
+    real: {
+      id: 'real',
+      speaker: 'Sprocket',
+      text: "*long pause* ...Wow. I had a joke loaded up in case this got awkward, but I don't need it. That actually means a lot. Like, a LOT a lot. Don't tell anyone I got emotional. I have a reputation.",
+    },
+    encourage: {
+      id: 'encourage',
+      speaker: 'Sprocket',
+      text: "Yeah... yeah, you're right. It IS a gift. I just wish it wasn't the ONLY thing people saw. But hey -- thanks for listening. That's more than most people do.",
+    },
+    brush_off: {
+      id: 'brush_off',
+      speaker: 'Sprocket',
+      text: "*puts the smile back on* Ha, yeah, totally overthinking it. You're right. Classic Sprocket. *laughs, but it doesn't reach his eyes* Anyway! Who wants to hear a penguin joke?",
+    },
+  },
+};
+
+const lily_drama: DialogueScript = {
+  id: 'lily_drama',
+  startNode: 'start',
+  nodes: {
+    start: {
+      id: 'start',
+      speaker: 'Lily',
+      text: "*whispering* I need advice. Blaze and Rosie had an argument by the fountain. They both came to me separately, asking me to take sides. I hate conflict...",
+      next: 'dilemma',
+    },
+    dilemma: {
+      id: 'dilemma',
+      speaker: 'Lily',
+      text: "Rosie says Blaze is manipulating people. Blaze says Rosie is too sensitive and needs to toughen up. I think they're both partly right, but if I say that, they'll both be upset with me. What would you do?",
+      choices: [
+        {
+          text: '"Tell them both the truth. Real friends can handle honesty."',
+          next: 'honest',
+          effects: { relationship_level: 10 },
+        },
+        {
+          text: '"You don\'t have to pick a side. Just be there for both of them."',
+          condition: (v) => v.charm >= 40,
+          lockMessage: 'Needs 40 charm for the diplomatic approach.',
+          next: 'wise',
+          effects: { relationship_level: 15 },
+        },
+        {
+          text: '"Honestly? Stay out of it. It\'s not your problem."',
+          next: 'avoid',
+          effects: { relationship_level: -5 },
+        },
+      ],
+    },
+    honest: {
+      id: 'honest',
+      speaker: 'Lily',
+      text: "*takes a deep breath* You're right. The forest teaches that storms clear the air. Maybe this argument needed to happen. I'll talk to them both. Thank you for the courage.",
+    },
+    wise: {
+      id: 'wise',
+      speaker: 'Lily',
+      text: "*eyes brighten* That's... exactly what the old oak by my home would say. You don't have to choose a branch to love the whole tree. You're wiser than you know.",
+    },
+    avoid: {
+      id: 'avoid',
+      speaker: 'Lily',
+      text: "*pulls back* That's... not how the forest works. Every creature is connected. When one is hurting, we all feel it. I thought you understood that.",
+    },
+  },
+};
+
+// ---------------------------------------------------------------------------
 // EXPORTS
 // ---------------------------------------------------------------------------
 
@@ -1847,6 +2162,15 @@ export const NPC_DIALOGUES: Record<string, DialogueScript[]> = {
 export const DATE_DIALOGUES: Record<string, DialogueScript> = {
   rosie: rosie_date,
   kiki: kiki_date,
+};
+
+export const DRAMA_DIALOGUES: Record<string, DialogueScript> = {
+  rosie: rosie_drama,
+  blaze: blaze_drama,
+  pudge: pudge_drama,
+  kiki: kiki_drama,
+  sprocket: sprocket_drama,
+  lily: lily_drama,
 };
 
 // ---------------------------------------------------------------------------
@@ -1897,35 +2221,92 @@ export function hasSeenDialogue(scriptId: string): boolean {
   return seenScripts.has(scriptId);
 }
 
+// ---------------------------------------------------------------------------
+// NPC dialogue progression tracking
+// ---------------------------------------------------------------------------
+// Each NPC starts at day-group 0 (day 1 scripts). When the player completes
+// a conversation with an NPC, that NPC advances to the next day-group.
+// If the player never talks to an NPC, they stay on their current group.
+
+const npcDialogueProgress: Record<string, number> = {};
+
+/** Get the current dialogue day-group index for an NPC (0-6). */
+export function getNPCDialogueDay(npcId: string): number {
+  return npcDialogueProgress[npcId] ?? 0;
+}
+
+/** Advance an NPC to the next dialogue day-group (max 6). */
+export function advanceNPCDialogue(npcId: string): void {
+  const current = npcDialogueProgress[npcId] ?? 0;
+  npcDialogueProgress[npcId] = Math.min(current + 1, 6);
+}
+
+/** Reset all NPC dialogue progress (used on new game). */
+export function resetNPCDialogueProgress(): void {
+  for (const key of Object.keys(npcDialogueProgress)) {
+    delete npcDialogueProgress[key];
+  }
+}
+
 /**
  * Pick the appropriate chat dialogue script for an NPC based on
- * the player's current relationship level with them.
+ * their dialogue progression day-group and the player's relationship.
  *
- * If the player has already seen that script today, returns a
- * short fallback one-liner instead.
+ * Uses the daily dialogue system: each NPC has 7 day-groups with
+ * 3 tier variants (low/mid/high). NPCs advance to the next group
+ * only when the player completes a conversation with them.
  *
- * Tier boundaries align with the relationship system:
- *   low  = relationship < 20   (hostile / cold / neutral)
- *   mid  = 20 <= relationship < 60  (warm / close-ish)
- *   high = relationship >= 60  (close / romantic)
+ * Falls back to the legacy NPC_DIALOGUES if no daily script exists.
+ *
+ * Tier boundaries:
+ *   low  = relationship < 20
+ *   mid  = 20 <= relationship < 60
+ *   high = relationship >= 60
  */
 export function getDialogueForNPC(npcId: string, relationship: number): DialogueScript {
+  const tierIndex = relationship >= 60 ? 2 : relationship >= 20 ? 1 : 0;
+  const dayIndex = getNPCDialogueDay(npcId);
+
+  // Try daily dialogue system first
+  const dailyScripts = DAILY_DIALOGUES[npcId]?.[dayIndex];
+  if (dailyScripts && dailyScripts[tierIndex]) {
+    const script = dailyScripts[tierIndex];
+    if (!hasSeenDialogue(script.id)) return script;
+
+    // Already seen today — return fallback
+    const firstNode = script.nodes[script.startNode];
+    const name = firstNode?.speaker ?? npcId;
+    return makeFallbackScript(npcId, name);
+  }
+
+  // Fallback to legacy NPC_DIALOGUES
   const scripts = NPC_DIALOGUES[npcId];
   if (!scripts || scripts.length === 0) {
     throw new Error(`No dialogue scripts found for NPC: ${npcId}`);
   }
 
-  let script: DialogueScript;
-  if (relationship >= 60) script = scripts[2] ?? scripts[scripts.length - 1];
-  else if (relationship >= 20) script = scripts[1] ?? scripts[0];
-  else script = scripts[0];
+  const script = scripts[tierIndex] ?? scripts[0];
 
-  // If already seen today, return a one-liner fallback
   if (hasSeenDialogue(script.id)) {
-    // Find the NPC name from the first node's speaker field
     const firstNode = script.nodes[script.startNode];
     const name = firstNode?.speaker ?? npcId;
     return makeFallbackScript(npcId, name);
+  }
+
+  return script;
+}
+
+/**
+ * Pick the drama dialogue script for an NPC.
+ * Falls back to regular chat dialogue if no drama script exists.
+ */
+export function getDramaDialogueForNPC(npcId: string, relationship: number): DialogueScript {
+  const script = DRAMA_DIALOGUES[npcId];
+  if (!script) return getDialogueForNPC(npcId, relationship);
+
+  // If already seen today, fall back to regular chat
+  if (hasSeenDialogue(script.id)) {
+    return getDialogueForNPC(npcId, relationship);
   }
 
   return script;

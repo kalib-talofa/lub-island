@@ -1,6 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
+import { PROD_ENERGY } from '@/game/constants';
 
 // Dynamic import Game component to avoid SSR issues with Three.js
 const Game = dynamic(() => import('@/game/Game'), { ssr: false });
@@ -16,7 +17,7 @@ export default function Home() {
       position: 'relative',
     }}>
       <Game />
-      <DevToolbar />
+      {!PROD_ENERGY && <DevToolbar />}
     </main>
   );
 }

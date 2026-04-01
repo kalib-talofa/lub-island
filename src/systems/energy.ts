@@ -1,6 +1,6 @@
 'use strict';
 
-import { ENERGY_COSTS } from '@/game/constants';
+import { ENERGY_COSTS, PROD_ENERGY } from '@/game/constants';
 
 type EnergyCostKey = keyof typeof ENERGY_COSTS;
 
@@ -8,6 +8,7 @@ type EnergyCostKey = keyof typeof ENERGY_COSTS;
  * Check whether the player can afford an energy cost.
  */
 export function canAfford(currentEnergy: number, cost: number): boolean {
+  if (PROD_ENERGY) return true;
   return currentEnergy >= cost;
 }
 
@@ -16,6 +17,7 @@ export function canAfford(currentEnergy: number, cost: number): boolean {
  * Throws if the player cannot afford the cost.
  */
 export function spendEnergy(currentEnergy: number, cost: number): number {
+  if (PROD_ENERGY) return currentEnergy;
   if (!canAfford(currentEnergy, cost)) {
     throw new Error(
       `Not enough energy: have ${currentEnergy}, need ${cost}`,

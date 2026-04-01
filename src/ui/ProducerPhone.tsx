@@ -13,6 +13,7 @@ const EVENT_OPTIONS = [
     description: "Compete in a mini-game for glory and prizes!",
     color: "from-blue-500 to-indigo-600",
     borderColor: "border-blue-400/40",
+    comingSoon: false,
   },
   {
     type: "date",
@@ -21,6 +22,7 @@ const EVENT_OPTIONS = [
     description: "Spend quality one-on-one time with someone special.",
     color: "from-pink-500 to-rose-600",
     borderColor: "border-pink-400/40",
+    comingSoon: false,
   },
   {
     type: "social",
@@ -29,6 +31,7 @@ const EVENT_OPTIONS = [
     description: "A group activity to bond with the whole cast.",
     color: "from-emerald-500 to-teal-600",
     borderColor: "border-emerald-400/40",
+    comingSoon: false,
   },
   {
     type: "drama",
@@ -37,6 +40,7 @@ const EVENT_OPTIONS = [
     description: "Stir the pot and shake up the island dynamics!",
     color: "from-orange-500 to-red-600",
     borderColor: "border-orange-400/40",
+    comingSoon: false,
   },
 ];
 
@@ -67,17 +71,27 @@ export default function ProducerPhone({
           {EVENT_OPTIONS.map((option) => (
             <button
               key={option.type}
-              onClick={() => onChooseEvent(option.type)}
-              className={`flex items-center gap-3 rounded-xl border bg-white/5 p-3 transition-all hover:bg-white/10 active:scale-[0.98] ${option.borderColor}`}
+              onClick={() => !option.comingSoon && onChooseEvent(option.type)}
+              disabled={option.comingSoon}
+              className={`flex items-center gap-3 rounded-xl border p-3 transition-all ${
+                option.comingSoon
+                  ? "cursor-not-allowed border-white/10 bg-white/[0.02] opacity-50"
+                  : `bg-white/5 hover:bg-white/10 active:scale-[0.98] ${option.borderColor}`
+              }`}
             >
               <div
-                className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br ${option.color} text-xl shadow-md`}
+                className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl text-xl shadow-md ${
+                  option.comingSoon ? "bg-gray-600" : `bg-gradient-to-br ${option.color}`
+                }`}
               >
                 {option.icon}
               </div>
               <div className="flex flex-col text-left">
                 <span className="text-sm font-bold text-white">
                   {option.label}
+                  {option.comingSoon && (
+                    <span className="ml-2 text-[10px] font-medium text-white/30">Coming Soon</span>
+                  )}
                 </span>
                 <span className="text-xs text-white/40">
                   {option.description}

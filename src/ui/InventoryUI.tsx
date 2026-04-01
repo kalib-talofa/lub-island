@@ -190,7 +190,7 @@ export default function InventoryUI({ onClose, onUseItem }: InventoryUIProps) {
                           {useLabel && (
                             <button
                               onClick={() => onUseItem(item)}
-                              className="rounded-lg bg-indigo-600/80 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-indigo-500 active:scale-95"
+                              className="rounded-lg bg-indigo-600/80 px-4 py-3 text-sm font-semibold text-white transition hover:bg-indigo-500 active:scale-95"
                             >
                               {useLabel}
                             </button>

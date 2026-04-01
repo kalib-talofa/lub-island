@@ -124,6 +124,7 @@ export function generateDailyEvents(
   day: number,
   week: number,
   cast: Character[],
+  producerChoice?: EventType | null,
 ): GameEvent[] {
   const dayType = getDayType(day);
   if (dayType === 'ceremony') return [];
@@ -161,6 +162,7 @@ export function generateDailyEvents(
   const guaranteedType: EventType | null =
     (dayInWeek === 2 || dayInWeek === 4) ? 'challenge' :
     (dayInWeek === 3 || dayInWeek === 5) ? 'date' :
+    (dayInWeek === 6) ? 'drama' :
     null;
 
   // First event is always the "headline" type for the day
@@ -169,9 +171,12 @@ export function generateDailyEvents(
 
   events.push(buildEvent(headlineType, day, week, 0, cast));
 
+  // Pick which remaining slot gets the producer's choice (if any)
+  const producerSlot = producerChoice ? 1 + Math.floor(Math.random() * (EVENTS_PER_DAY - 1)) : -1;
+
   // Fill the remaining slots with available types
   for (let i = 1; i < EVENTS_PER_DAY; i++) {
-    const type = pickRandom(availableTypes);
+    const type = (i === producerSlot && producerChoice) ? producerChoice : pickRandom(availableTypes);
     events.push(buildEvent(type, day, week, i, cast));
   }
 

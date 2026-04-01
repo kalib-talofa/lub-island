@@ -26,16 +26,16 @@ html, body {
   height: 100%;
 }
 
-/* Game viewport container - portrait mode anchored left */
+/* Game viewport container — always fits the screen, centered with letterboxing */
 .game-viewport {
   position: fixed;
-  left: 0;
+  left: 50%;
   top: 50%;
-  transform: translateY(-50%);
-  width: var(--game-width);
-  height: var(--game-height);
-  max-height: 100vh;
-  max-width: calc(100vh * 9 / 16);
+  transform: translate(-50%, -50%);
+  /* Fluid sizing: fill width on tall screens, fill height on wide screens.
+     dvh accounts for mobile browser chrome (address bar, etc.) */
+  width: min(100vw, calc(100dvh * 9 / 16));
+  height: auto;
   aspect-ratio: 9 / 16;
   overflow: hidden;
   border-radius: 12px;
