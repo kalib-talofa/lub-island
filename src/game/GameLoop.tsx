@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useGameStore } from '@/store/gameStore';
 import { usePlayerStore } from '@/store/playerStore';
 import { useBiometricStore } from '@/store/biometricStore';
@@ -64,6 +64,9 @@ export interface GameLoopState {
   briefingEvents: string[];
 }
 
+/** Module-level ref so DevToolbar can read active drops without prop drilling */
+export const droppedItemsRef: { current: DroppedItem[] } = { current: [] };
+
 export function useGameLoop() {
   const gameStore = useGameStore();
   const playerStore = usePlayerStore();
@@ -98,6 +101,9 @@ export function useGameLoop() {
     dateNPCName: '',
     briefingEvents: [],
   });
+
+  // Keep droppedItemsRef in sync for DevToolbar access
+  useEffect(() => { droppedItemsRef.current = state.droppedItems; }, [state.droppedItems]);
 
   // Get active (non-eliminated) cast
   const activeCast = useMemo(() =>
