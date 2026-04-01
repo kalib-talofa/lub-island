@@ -26,12 +26,12 @@ html, body {
   height: 100%;
 }
 
-/* Game viewport container - portrait mode centered */
+/* Game viewport container - portrait mode anchored left */
 .game-viewport {
-  position: absolute;
-  left: 50%;
+  position: fixed;
+  left: 0;
   top: 50%;
-  transform: translate(-50%, -50%);
+  transform: translateY(-50%);
   width: var(--game-width);
   height: var(--game-height);
   max-height: 100vh;

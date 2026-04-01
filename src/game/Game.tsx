@@ -159,7 +159,7 @@ export default function Game() {
   const giftableItems = state.dialogueActive ? playerStore.getGiftableItems() : [];
 
   return (
-    <div ref={viewportRef} className="game-viewport" style={{ position: 'relative' }}>
+    <div ref={viewportRef} className="game-viewport">
       {/* 3D Scene */}
       <Canvas
         shadows

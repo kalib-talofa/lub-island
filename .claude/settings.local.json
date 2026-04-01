@@ -21,7 +21,8 @@
       "Bash(timeout 5)",
       "Bash(timeout)",
       "Bash(timeout 3)",
-      "Bash(node -e \":*)"
+      "Bash(node -e \":*)",
+      "Bash(node -e \"const path = require\\(''path''\\); const p = require.resolve\\(''three/examples/jsm/utils/SkeletonUtils.js''\\); console.log\\(p\\);\")"
     ]
   }
 }

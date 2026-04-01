@@ -4,6 +4,7 @@ import { useRef, useMemo, useEffect, Suspense } from "react";
 import * as THREE from "three";
 import { useFrame } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
+import { clone as cloneSkinnedScene } from "three/examples/jsm/utils/SkeletonUtils.js";
 import { PLAYER } from "@/game/constants";
 import { ZONE_POSITIONS } from "@/scene/IslandEnvironment";
 import { VILLA_INTERIOR, BED_POSITIONS } from "@/scene/VillaInterior";
@@ -391,19 +392,34 @@ export default function PlayerController({
 }
 
 // ---------------------------------------------------------------------------
-// Ferret GLB character (static model with programmatic animation)
+// Ferret GLB character (rigged model with procedural animation)
 // ---------------------------------------------------------------------------
 
 const FERRET_SCALE = 1.2;
 
+/** Look up a bone by name from the skeleton hierarchy */
+function findBone(root: THREE.Object3D, name: string): THREE.Bone | null {
+  let found: THREE.Bone | null = null;
+  root.traverse((child) => {
+    if ((child as THREE.Bone).isBone && child.name === name) {
+      found = child as THREE.Bone;
+    }
+  });
+  return found;
+}
+
+// Reusable quaternion / euler helpers (avoid per-frame allocations)
+const _euler = new THREE.Euler();
+const _quat = new THREE.Quaternion();
+
 function FerretCharacter({ isMoving }: { isMoving: React.MutableRefObject<boolean> }) {
   const { scene } = useGLTF("/models/Characters/Ferret.glb");
   const modelRef = useRef<THREE.Group>(null);
-  const breathPhase = useRef(0);
+  const animPhase = useRef(0);
 
-  // Clone the scene so we can safely transform it
+  // Clone with SkeletonUtils so skinned mesh + skeleton bindings are preserved
   const clonedScene = useMemo(() => {
-    const clone = scene.clone(true);
+    const clone = cloneSkinnedScene(scene);
     clone.traverse((child) => {
       if ((child as THREE.Mesh).isMesh) {
         child.castShadow = true;
@@ -413,14 +429,33 @@ function FerretCharacter({ isMoving }: { isMoving: React.MutableRefObject<boolea
     return clone;
   }, [scene]);
 
+  // Cache bone references + their original (bind-pose) quaternions
+  const bones = useMemo(() => {
+    const names = [
+      "Hip", "Waist", "Spine01", "Spine02", "Head",
+      "L_Clavicle", "L_Upperarm", "L_Forearm", "L_Hand",
+      "R_Clavicle", "R_Upperarm", "R_Forearm", "R_Hand",
+      "L_Thigh", "L_Calf", "L_Foot",
+      "R_Thigh", "R_Calf", "R_Foot",
+    ] as const;
+
+    const map: Record<string, { bone: THREE.Bone; bindQuat: THREE.Quaternion }> = {};
+    for (const name of names) {
+      const bone = findBone(clonedScene, name);
+      if (bone) {
+        map[name] = { bone, bindQuat: bone.quaternion.clone() };
+      }
+    }
+    return map;
+  }, [clonedScene]);
+
   // Centre and ground the model based on its bounding box
   const layout = useMemo(() => {
     const box = new THREE.Box3().setFromObject(clonedScene);
     const size = box.getSize(new THREE.Vector3());
     const center = box.getCenter(new THREE.Vector3());
-    const targetHeight = 1.2; // world units
+    const targetHeight = 1.2;
     const fitScale = targetHeight / size.y;
-    // Shift pivot forward on Z by 75% of depth (tail is behind, body centre is forward)
     const pivotZ = box.min.z + size.z * 0.75;
     return {
       fitScale,
@@ -428,17 +463,173 @@ function FerretCharacter({ isMoving }: { isMoving: React.MutableRefObject<boolea
     };
   }, [clonedScene]);
 
+  // Helper: apply an additive euler rotation on top of bind pose
+  const applyPose = (name: string, rx: number, ry: number, rz: number) => {
+    const entry = bones[name];
+    if (!entry) return;
+    _euler.set(rx, ry, rz);
+    _quat.setFromEuler(_euler);
+    entry.bone.quaternion.copy(entry.bindQuat).multiply(_quat);
+  };
+
+  // ---------------------------------------------------------------------------
+  // Probe the actual bone axes on the first few frames so we know exactly
+  // which euler rotation brings each arm downward.
+  // ---------------------------------------------------------------------------
+  const probeResult = useRef<{
+    L_axis: 'x' | 'y' | 'z'; L_sign: number;
+    R_axis: 'x' | 'y' | 'z'; R_sign: number;
+  } | null>(null);
+  const frameCount = useRef(0);
+
   useFrame((_, delta) => {
     if (!modelRef.current) return;
 
-    breathPhase.current += delta * 2.5;
-    const breathScale = 1 + Math.sin(breathPhase.current) * 0.015;
-    const walkPulse = isMoving.current
-      ? 1 + Math.sin(breathPhase.current * 4) * 0.03
-      : 1;
+    frameCount.current++;
 
+    // On frame 5, probe each axis to find which one moves the hand downward
+    if (!probeResult.current && frameCount.current === 5) {
+      const result: { L_axis: 'x'|'y'|'z'; L_sign: number; R_axis: 'x'|'y'|'z'; R_sign: number } = { L_axis: 'x', L_sign: 1, R_axis: 'x', R_sign: 1 };
+
+      for (const [armName, side] of [["L_Upperarm", "L"], ["R_Upperarm", "R"]] as const) {
+        const entry = bones[armName];
+        const handEntry = bones[side === "L" ? "L_Hand" : "R_Hand"];
+        if (!entry || !handEntry) continue;
+
+        // Reset to bind and get baseline hand world position
+        entry.bone.quaternion.copy(entry.bindQuat);
+        entry.bone.updateWorldMatrix(true, true);
+        const baseY = handEntry.bone.getWorldPosition(new THREE.Vector3()).y;
+
+        let bestAxis: 'x' | 'y' | 'z' = 'x';
+        let bestSign = 1;
+        let lowestY = Infinity;
+
+        // Try each axis with +/- rotation
+        for (const axis of ['x', 'y', 'z'] as const) {
+          for (const sign of [1, -1]) {
+            const testAngle = sign * 1.5;
+            _euler.set(
+              axis === 'x' ? testAngle : 0,
+              axis === 'y' ? testAngle : 0,
+              axis === 'z' ? testAngle : 0,
+            );
+            _quat.setFromEuler(_euler);
+            entry.bone.quaternion.copy(entry.bindQuat).multiply(_quat);
+            entry.bone.updateWorldMatrix(true, true);
+            const handY = handEntry.bone.getWorldPosition(new THREE.Vector3()).y;
+
+            if (handY < lowestY) {
+              lowestY = handY;
+              bestAxis = axis;
+              bestSign = sign;
+            }
+          }
+        }
+
+        // Reset to bind
+        entry.bone.quaternion.copy(entry.bindQuat);
+
+        if (side === "L") { result.L_axis = bestAxis; result.L_sign = bestSign; }
+        else { result.R_axis = bestAxis; result.R_sign = bestSign; }
+
+        console.log(`[ARM] ${armName}: best axis=${bestAxis} sign=${bestSign} (baseY=${baseY.toFixed(3)} lowestY=${lowestY.toFixed(3)})`);
+      }
+
+      probeResult.current = result;
+    }
+
+    const walking = isMoving.current;
+    const speed = walking ? 8 : 2.5;
+    animPhase.current += delta * speed;
+    const t = animPhase.current;
+    const sin = Math.sin(t);
+    const cos = Math.cos(t);
+    const breathY = Math.sin(t) * 0.015;
+    const probe = probeResult.current;
+
+    // Helper: apply arm-down rotation using the probed axis
+    const applyArmDown = (armName: string, side: 'L' | 'R', angle: number) => {
+      if (!probe) return;
+      const axis = side === 'L' ? probe.L_axis : probe.R_axis;
+      const sign = side === 'L' ? probe.L_sign : probe.R_sign;
+      const a = sign * angle;
+      _euler.set(
+        axis === 'x' ? a : 0,
+        axis === 'y' ? a : 0,
+        axis === 'z' ? a : 0,
+      );
+      _quat.setFromEuler(_euler);
+      const entry = bones[armName];
+      if (entry) entry.bone.quaternion.copy(entry.bindQuat).multiply(_quat);
+    };
+
+    if (!walking) {
+      // --- IDLE ---
+      applyPose("Spine01", sin * 0.02, 0, 0);
+      applyPose("Spine02", sin * 0.01, 0, 0);
+      applyPose("Head", -sin * 0.03, cos * 0.02, 0);
+
+      // Arms at rest — use probed axis with ~80° down
+      applyArmDown("L_Upperarm", "L", 1.4);
+      applyArmDown("R_Upperarm", "R", 1.4);
+      applyPose("L_Forearm", 0, 0, 0);
+      applyPose("R_Forearm", 0, 0, 0);
+
+      // Legs idle
+      applyPose("L_Thigh", 0, 0, 0);
+      applyPose("L_Calf", 0, 0, 0);
+      applyPose("R_Thigh", 0, 0, 0);
+      applyPose("R_Calf", 0, 0, 0);
+      applyPose("Hip", 0, 0, 0);
+    } else {
+      // --- WALK CYCLE ---
+      const stride = 0.4;
+      const armSwing = 0.5;
+      const waddle = 0.08;
+      const bounce = 0.04;
+
+      applyPose("Hip", 0, 0, Math.sin(t) * waddle);
+      applyPose("Spine01", Math.sin(t * 2) * bounce, 0, -Math.sin(t) * waddle * 0.5);
+      applyPose("Spine02", 0, Math.sin(t) * 0.05, 0);
+      applyPose("Head", 0, -Math.sin(t) * 0.04, -Math.sin(t) * waddle * 0.3);
+
+      // Legs
+      const legL = Math.sin(t);
+      const legR = Math.sin(t + Math.PI);
+      applyPose("L_Thigh", legL * stride, 0, 0);
+      applyPose("L_Calf", Math.max(0, -legL) * stride * 0.6, 0, 0);
+      applyPose("L_Foot", -legL * stride * 0.3, 0, 0);
+      applyPose("R_Thigh", legR * stride, 0, 0);
+      applyPose("R_Calf", Math.max(0, -legR) * stride * 0.6, 0, 0);
+      applyPose("R_Foot", -legR * stride * 0.3, 0, 0);
+
+      // Arms: rest (down via Z) + forward/back swing (via X, perpendicular axis)
+      const armL = Math.sin(t + Math.PI);
+      const armR = Math.sin(t);
+      if (probe) {
+        // Apply arm-down on probed Z axis, then add swing on X axis
+        const lEntry = bones["L_Upperarm"];
+        const rEntry = bones["R_Upperarm"];
+        if (lEntry) {
+          _euler.set(armL * armSwing, 0, probe.L_sign * 1.4);
+          _quat.setFromEuler(_euler);
+          lEntry.bone.quaternion.copy(lEntry.bindQuat).multiply(_quat);
+        }
+        if (rEntry) {
+          _euler.set(armR * armSwing, 0, probe.R_sign * 1.4);
+          _quat.setFromEuler(_euler);
+          rEntry.bone.quaternion.copy(rEntry.bindQuat).multiply(_quat);
+        }
+      }
+      applyPose("L_Forearm", 0, 0, 0);
+      applyPose("R_Forearm", 0, 0, 0);
+    }
+
+    // Scale: gentle breathing
     const s = layout.fitScale * FERRET_SCALE;
-    modelRef.current.scale.set(s * walkPulse, s * breathScale, s * walkPulse);
+    const breathScale = 1 + breathY;
+    modelRef.current.scale.set(s, s * breathScale, s);
   });
 
   const s = layout.fitScale * FERRET_SCALE;
