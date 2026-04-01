@@ -559,21 +559,29 @@ function FerretCharacter({ isMoving }: { isMoving: React.MutableRefObject<boolea
     const breathY = Math.sin(t) * 0.015;
     const probe = probeResult.current;
 
-    // Helper: apply arm-down rotation using the probed axis
-    const applyArmDown = (armName: string, side: 'L' | 'R', angle: number) => {
+    // Helper: apply arm pose with down angle + forward tilt + outward splay
+    // downAngle: how far down (probed axis), fwd: forward tilt (X), splay: outward from body (Y)
+    const applyArm = (armName: string, side: 'L' | 'R', downAngle: number, fwd: number, splay: number) => {
       if (!probe) return;
-      const axis = side === 'L' ? probe.L_axis : probe.R_axis;
+      const entry = bones[armName];
+      if (!entry) return;
       const sign = side === 'L' ? probe.L_sign : probe.R_sign;
-      const a = sign * angle;
+      const axis = side === 'L' ? probe.L_axis : probe.R_axis;
+      // Outward splay flips direction for left vs right arm
+      const splayDir = side === 'L' ? -1 : 1;
       _euler.set(
-        axis === 'x' ? a : 0,
-        axis === 'y' ? a : 0,
-        axis === 'z' ? a : 0,
+        fwd + (axis === 'x' ? sign * downAngle : 0),
+        splay * splayDir + (axis === 'y' ? sign * downAngle : 0),
+        axis === 'z' ? sign * downAngle : 0,
       );
       _quat.setFromEuler(_euler);
-      const entry = bones[armName];
-      if (entry) entry.bone.quaternion.copy(entry.bindQuat).multiply(_quat);
+      entry.bone.quaternion.copy(entry.bindQuat).multiply(_quat);
     };
+
+    // Arm tuning constants
+    const armDown = 1.0;      // ~57° down (was 1.4/~80° — less extreme, more to the sides)
+    const armFwd = 0.3;       // forward tilt to bring arms to sides instead of behind
+    const armSplay = 0.2;     // outward push to prevent clipping into pudgy body
 
     if (!walking) {
       // --- IDLE ---
@@ -581,11 +589,12 @@ function FerretCharacter({ isMoving }: { isMoving: React.MutableRefObject<boolea
       applyPose("Spine02", sin * 0.01, 0, 0);
       applyPose("Head", -sin * 0.03, cos * 0.02, 0);
 
-      // Arms at rest — use probed axis with ~80° down
-      applyArmDown("L_Upperarm", "L", 1.4);
-      applyArmDown("R_Upperarm", "R", 1.4);
-      applyPose("L_Forearm", 0, 0, 0);
-      applyPose("R_Forearm", 0, 0, 0);
+      // Arms at rest — at sides, slightly forward, splayed out from body
+      applyArm("L_Upperarm", "L", armDown, armFwd, armSplay);
+      applyArm("R_Upperarm", "R", armDown, armFwd, armSplay);
+      // Slight forearm bend so hands aren't stiff
+      applyPose("L_Forearm", 0.15, 0, 0);
+      applyPose("R_Forearm", 0.15, 0, 0);
 
       // Legs idle
       applyPose("L_Thigh", 0, 0, 0);
@@ -596,7 +605,6 @@ function FerretCharacter({ isMoving }: { isMoving: React.MutableRefObject<boolea
     } else {
       // --- WALK CYCLE ---
       const stride = 0.4;
-      const armSwing = 0.5;
       const waddle = 0.08;
       const bounce = 0.04;
 
@@ -615,26 +623,13 @@ function FerretCharacter({ isMoving }: { isMoving: React.MutableRefObject<boolea
       applyPose("R_Calf", Math.max(0, -legR) * stride * 0.6, 0, 0);
       applyPose("R_Foot", -legR * stride * 0.3, 0, 0);
 
-      // Arms: rest (down via Z) + forward/back swing (via X, perpendicular axis)
-      const armL = Math.sin(t + Math.PI);
-      const armR = Math.sin(t);
-      if (probe) {
-        // Apply arm-down on probed Z axis, then add swing on X axis
-        const lEntry = bones["L_Upperarm"];
-        const rEntry = bones["R_Upperarm"];
-        if (lEntry) {
-          _euler.set(armL * armSwing, 0, probe.L_sign * 1.4);
-          _quat.setFromEuler(_euler);
-          lEntry.bone.quaternion.copy(lEntry.bindQuat).multiply(_quat);
-        }
-        if (rEntry) {
-          _euler.set(armR * armSwing, 0, probe.R_sign * 1.4);
-          _quat.setFromEuler(_euler);
-          rEntry.bone.quaternion.copy(rEntry.bindQuat).multiply(_quat);
-        }
-      }
-      applyPose("L_Forearm", 0, 0, 0);
-      applyPose("R_Forearm", 0, 0, 0);
+      // Arms: gentle flap (oscillate down angle) instead of forward/back swing
+      const flapL = Math.sin(t + Math.PI) * 0.15;  // ±0.15 rad flap
+      const flapR = Math.sin(t) * 0.15;
+      applyArm("L_Upperarm", "L", armDown + flapL, armFwd, armSplay);
+      applyArm("R_Upperarm", "R", armDown + flapR, armFwd, armSplay);
+      applyPose("L_Forearm", 0.15, 0, 0);
+      applyPose("R_Forearm", 0.15, 0, 0);
     }
 
     // Scale: gentle breathing
