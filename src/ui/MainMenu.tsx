@@ -75,7 +75,7 @@ export default function MainMenu({ onStart }: MainMenuProps) {
 
       {/* Footer */}
       <p className="absolute bottom-8 text-xs text-white/40">
-        {"\u{1F43E}"} A Supercell prototype {"\u{1F43E}"}
+        {"\u{1F43E}"} Arctic Bootcamp Prototype {"\u{1F43E}"}
       </p>
     </div>
   );
