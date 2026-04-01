@@ -12,7 +12,16 @@
       "mcp__Claude_Preview__preview_start",
       "Bash(git init:*)",
       "Bash(git remote:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git branch:*)",
+      "Bash(git push:*)",
+      "Bash(taskkill /F /IM node.exe)",
+      "Bash(timeout 4)",
+      "Bash(timeout 5)",
+      "Bash(timeout)",
+      "Bash(timeout 3)",
+      "Bash(node -e \":*)"
     ]
   }
 }
