@@ -151,7 +151,11 @@ const ZONES_FOR_DROPS = ['beach', 'garden', 'arena', 'dock', 'lookout'];
 
 const ISLAND_RADIUS = 19;
 
+let _dropCounter = 0;
+
 export interface DroppedItem {
+  /** Unique ID for this specific drop instance */
+  dropId: string;
   item: ItemDef;
   position: [number, number, number];
   /** If true, this item is inside the villa */
@@ -204,6 +208,7 @@ export function generateNightlyDrops(zonePositions: Record<string, [number, numb
         const bx = bed.position[0] + (Math.random() - 0.5) * 1.5;
         const bz = bed.position[2] + (Math.random() - 0.5) * 1.5;
         drops.push({
+          dropId: `drop-${++_dropCounter}`,
           item,
           position: [bx, 0.3, bz],
           isIndoors: true,
@@ -227,6 +232,7 @@ export function generateNightlyDrops(zonePositions: Record<string, [number, numb
     const [cx, cz] = clampToPlayableArea(base[0] + offsetX, base[2] + offsetZ);
 
     drops.push({
+      dropId: `drop-${++_dropCounter}`,
       item,
       position: [cx, 0.3, cz],
     });

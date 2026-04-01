@@ -28,7 +28,7 @@ interface IslandProps {
   onNPCInteract: (npcId: string) => void;
   onBedInteract?: (npcId: string, isSleeping: boolean) => void;
   droppedItems?: DroppedItem[];
-  onItemPickup?: (index: number) => void;
+  onItemPickup?: (dropId: string) => void;
 }
 
 export default function Island({ onNPCInteract, onBedInteract, droppedItems = [], onItemPickup }: IslandProps) {
@@ -66,11 +66,7 @@ export default function Island({ onNPCInteract, onBedInteract, droppedItems = []
           {droppedItems.length > 0 && onItemPickup && (
             <ItemPickups
               drops={droppedItems.filter(d => d.isIndoors)}
-              onPickup={(filteredIdx) => {
-                // Map filtered index back to original index
-                const indoorItems = droppedItems.map((d, i) => ({ d, i })).filter(x => x.d.isIndoors);
-                if (indoorItems[filteredIdx]) onItemPickup(indoorItems[filteredIdx].i);
-              }}
+              onPickup={onItemPickup}
             />
           )}
         </>
@@ -85,10 +81,7 @@ export default function Island({ onNPCInteract, onBedInteract, droppedItems = []
           {droppedItems.length > 0 && onItemPickup && (
             <ItemPickups
               drops={droppedItems.filter(d => !d.isIndoors)}
-              onPickup={(filteredIdx) => {
-                const outdoorItems = droppedItems.map((d, i) => ({ d, i })).filter(x => !x.d.isIndoors);
-                if (outdoorItems[filteredIdx]) onItemPickup(outdoorItems[filteredIdx].i);
-              }}
+              onPickup={onItemPickup}
             />
           )}
         </>

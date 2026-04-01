@@ -211,6 +211,7 @@ export default function Game() {
             flexDirection: 'column',
             gap: '6px',
             width: '210px',
+            zIndex: 45,
           }}>
             {/* Checklist header */}
             <div className="flex items-center gap-1.5 px-1 pb-0.5">
@@ -344,22 +345,97 @@ export default function Game() {
           </div>
         )}
 
-        {/* Night time - go to sleep button */}
+        {/* Night time - item checklist + go to sleep */}
         {gameStore.phase === 'NIGHTTIME_FREE' && !state.dialogueActive && (
-          <div style={{ pointerEvents: 'auto', position: 'absolute', bottom: '180px', right: '12px' }}>
+          <div style={{
+            pointerEvents: 'auto',
+            position: 'absolute',
+            bottom: '180px',
+            right: '8px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '3px',
+            width: '160px',
+            zIndex: 45,
+          }}>
+            {/* Compact header with count */}
+            <div className="flex items-center gap-1 px-1"
+              style={{ textShadow: '0 1px 4px rgba(0,0,0,0.7)' }}
+            >
+              <span className="text-[10px]">{"\u2728"}</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-white/70">
+                Items
+              </span>
+              <span className="ml-auto text-[10px] font-semibold text-white/50">
+                {state.nightDropsOriginal.length - state.droppedItems.length}/{state.nightDropsOriginal.length}
+              </span>
+            </div>
+
+            {/* Compact item rows */}
+            {state.nightDropsOriginal.map((drop, i) => {
+              const isPickedUp = !state.droppedItems.some(d => d.dropId === drop.dropId);
+              const ITEM_EMOJIS: Record<string, string> = {
+                flowers: '\u{1F490}',
+                chocolate: '\u{1F36B}',
+                book: '\u{1F4D6}',
+                sunglasses: '\u{1F576}\u{FE0F}',
+                producer_phone: '\u{1F4F1}',
+              };
+              const emoji = drop.item.id.startsWith('journal_')
+                ? '\u{1F4D3}'
+                : ITEM_EMOJIS[drop.item.id] ?? '\u{1F381}';
+
+              return (
+                <div
+                  key={`night-item-${i}`}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    padding: '3px 8px',
+                    borderRadius: '8px',
+                    background: isPickedUp
+                      ? 'rgba(0,0,0,0.45)'
+                      : 'rgba(0,0,0,0.35)',
+                    fontSize: '11px',
+                    fontWeight: 600,
+                  }}
+                >
+                  <span style={{
+                    color: isPickedUp ? '#4ade80' : 'rgba(255,255,255,0.4)',
+                    fontSize: '10px',
+                    flexShrink: 0,
+                  }}>
+                    {isPickedUp ? '\u2713' : '\u25CB'}
+                  </span>
+                  <span style={{
+                    color: isPickedUp ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.85)',
+                    textDecoration: isPickedUp ? 'line-through' : 'none',
+                    lineHeight: '1.2',
+                  }}>
+                    {emoji} {drop.item.name}
+                  </span>
+                </div>
+              );
+            })}
+
+            {/* Go to Sleep button */}
             <button
               onClick={goToSleep}
               className="game-button"
               style={{
-                padding: '10px 20px',
-                borderRadius: '16px',
+                marginTop: '2px',
+                padding: '8px 12px',
+                borderRadius: '10px',
                 background: 'linear-gradient(135deg, #1e1b4b, #312e81)',
                 color: 'white',
                 border: '2px solid #6366f1',
-                fontSize: '14px',
+                fontSize: '12px',
                 fontWeight: 'bold',
                 cursor: 'pointer',
                 boxShadow: '0 2px 12px rgba(99,102,241,0.4)',
+                width: '100%',
+                textAlign: 'center',
               }}
             >
               {"\u{1F319}"} Go to Sleep

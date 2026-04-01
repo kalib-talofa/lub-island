@@ -42,14 +42,13 @@ function getItemLabel(itemId: string): string {
 
 interface PickupProps {
   drop: DroppedItem;
-  index: number;
-  onPickup: (index: number) => void;
+  onPickup: (dropId: string) => void;
 }
 
-function Pickup({ drop, index, onPickup }: PickupProps) {
+function Pickup({ drop, onPickup }: PickupProps) {
   const meshRef = useRef<THREE.Mesh>(null);
   const glowRef = useRef<THREE.PointLight>(null);
-  const phase = useRef(index * 1.3); // stagger animation
+  const phase = useRef(Math.random() * 10); // stagger animation
   const pickedUp = useRef(false);
 
   const color = useMemo(() => getItemColor(drop.item.id), [drop.item.id]);
@@ -68,7 +67,7 @@ function Pickup({ drop, index, onPickup }: PickupProps) {
 
     // Pulse glow
     if (glowRef.current) {
-      glowRef.current.intensity = 0.8 + Math.sin(phase.current * 3) * 0.4;
+      glowRef.current.intensity = 1.4 + Math.sin(phase.current * 3) * 0.6;
     }
 
     // Check player distance for auto-pickup
@@ -78,7 +77,7 @@ function Pickup({ drop, index, onPickup }: PickupProps) {
 
     if (dist < PICKUP_RADIUS) {
       pickedUp.current = true;
-      onPickup(index);
+      onPickup(drop.dropId);
     }
   });
 
@@ -131,14 +130,14 @@ function Pickup({ drop, index, onPickup }: PickupProps) {
 
 interface ItemPickupsProps {
   drops: DroppedItem[];
-  onPickup: (index: number) => void;
+  onPickup: (dropId: string) => void;
 }
 
 export default function ItemPickups({ drops, onPickup }: ItemPickupsProps) {
   return (
     <>
-      {drops.map((drop, i) => (
-        <Pickup key={`${drop.item.id}-${i}`} drop={drop} index={i} onPickup={onPickup} />
+      {drops.map((drop) => (
+        <Pickup key={drop.dropId} drop={drop} onPickup={onPickup} />
       ))}
     </>
   );

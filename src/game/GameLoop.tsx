@@ -50,6 +50,7 @@ export interface GameLoopState {
 
   // Dropped items in world
   droppedItems: DroppedItem[];
+  nightDropsOriginal: DroppedItem[];
 
   // Ceremony
   ceremonyPhase: 'choosing' | 'results';
@@ -97,6 +98,7 @@ export function useGameLoop() {
     itemPopupName: '',
     itemPopupDesc: '',
     droppedItems: [],
+    nightDropsOriginal: [],
     ceremonyPhase: 'choosing',
     ceremonyResults: [],
     eliminatedThisCeremony: [],
@@ -224,17 +226,17 @@ export function useGameLoop() {
   // Item pickups from world
   // ---------------------------------------------------------------------------
 
-  const handleItemPickup = useCallback((index: number) => {
-    const drop = state.droppedItems[index];
+  const handleItemPickup = useCallback((dropId: string) => {
+    const drop = state.droppedItems.find(d => d.dropId === dropId);
     if (!drop) return;
 
     playerStore.addItem(drop.item);
 
-    // Remove from drops
-    droppedItemsRef.current = droppedItemsRef.current.filter((_, i) => i !== index);
+    // Remove from drops by unique ID
+    droppedItemsRef.current = droppedItemsRef.current.filter(d => d.dropId !== dropId);
     setState(s => ({
       ...s,
-      droppedItems: s.droppedItems.filter((_, i) => i !== index),
+      droppedItems: s.droppedItems.filter(d => d.dropId !== dropId),
       showItemPopup: true,
       itemPopupName: `Found: ${drop.item.name}`,
       itemPopupDesc: drop.item.description,
@@ -481,7 +483,7 @@ export function useGameLoop() {
   const spawnNightlyDrops = useCallback(() => {
     const drops = generateNightlyDrops(ZONE_POSITIONS);
     droppedItemsRef.current = drops;
-    setState(s => ({ ...s, droppedItems: drops }));
+    setState(s => ({ ...s, droppedItems: drops, nightDropsOriginal: drops }));
   }, []);
   triggerNightSpawnRef.current = spawnNightlyDrops;
 
@@ -524,6 +526,7 @@ export function useGameLoop() {
       dailyEvents: events,
       briefingEvents,
       droppedItems: [], // Clear leftover drops
+      nightDropsOriginal: [],
     }));
   }, [gameStore, activeCast, playerStore]);
 
