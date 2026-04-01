@@ -44,6 +44,11 @@ export const npcPositionsRef: { current: Record<string, [number, number, number]
   current: {},
 };
 
+/** Module-level ref: NPCs currently within interaction radius of the player */
+export const nearbyNPCsRef: { current: Array<{ id: string; name: string }> } = {
+  current: [],
+};
+
 function getZonePosition(preferredZone: string, npcId?: string): [number, number, number] {
   const key = ZONE_KEY_MAP[preferredZone] ?? preferredZone.toLowerCase();
   const base = ZONE_POSITIONS[key] ?? [0, 0, 0];
@@ -443,6 +448,27 @@ export default function NPCController({ isNight, onNPCInteract }: NPCControllerP
     }
     npcPositionsRef.current = positions;
   }, [npcPlacements]);
+
+  // Track which NPCs are within interaction radius of the player each frame
+  const visibleNPCs = useMemo(
+    () => npcPlacements.filter((n) => n.visible),
+    [npcPlacements],
+  );
+  const visibleNPCsRef = useRef(visibleNPCs);
+  visibleNPCsRef.current = visibleNPCs;
+
+  useFrame(() => {
+    const nearby: Array<{ id: string; name: string }> = [];
+    for (const npc of visibleNPCsRef.current) {
+      const dx = playerPositionRef.current.x - npc.position[0];
+      const dz = playerPositionRef.current.z - npc.position[2];
+      const dist = Math.sqrt(dx * dx + dz * dz);
+      if (dist < PLAYER.INTERACTION_RADIUS) {
+        nearby.push({ id: npc.id, name: npc.name });
+      }
+    }
+    nearbyNPCsRef.current = nearby;
+  });
 
   return (
     <>

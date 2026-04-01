@@ -12,6 +12,7 @@ import { STARTING_CAST } from '@/characters/roster';
 import HUD from '@/ui/HUD';
 import DialogueBox from '@/ui/DialogueBox';
 import VirtualJoystick from '@/ui/VirtualJoystick';
+import InteractButtons from '@/ui/InteractButtons';
 import MainMenu from '@/ui/MainMenu';
 import MorningBriefing from '@/ui/MorningBriefing';
 import EventScreen from '@/ui/EventScreen';
@@ -192,6 +193,11 @@ export default function Game() {
           <div style={{ pointerEvents: 'auto' }}>
             <VirtualJoystick />
           </div>
+        )}
+
+        {/* Interact buttons — shown when near NPCs during free roam */}
+        {showFreeRoamUI && !state.dialogueActive && (
+          <InteractButtons onInteract={handleNPCInteract} />
         )}
 
         {/* Daily event checklist - shown during daytime free roam */}
@@ -401,6 +407,10 @@ export default function Game() {
               performance={bio.performance}
               events={state.briefingEvents}
               onContinue={continueMorning}
+              sleepHours={bio.sleepHours}
+              sleepQuality={bio.sleepQuality}
+              activeMinutes={bio.activeMinutes}
+              stepCount={bio.stepCount}
             />
           </div>
         )}
