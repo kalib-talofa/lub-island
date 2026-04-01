@@ -53,9 +53,13 @@ export interface GameLoopState {
   nightDropsOriginal: DroppedItem[];
 
   // Ceremony
-  ceremonyPhase: 'choosing' | 'results';
+  ceremonyPhase: 'choosing' | 'results' | 'departure' | 'demo_end';
   ceremonyResults: { npcId: string; partnerId: string | null }[];
   eliminatedThisCeremony: string[];
+
+  // Challenge
+  challengeNPCId: string;
+  challengeNPCName: string;
 
   // Date
   dateNPCId: string;
@@ -102,6 +106,8 @@ export function useGameLoop() {
     ceremonyPhase: 'choosing',
     ceremonyResults: [],
     eliminatedThisCeremony: [],
+    challengeNPCId: '',
+    challengeNPCName: '',
     dateNPCId: '',
     dateNPCName: '',
     briefingEvents: [],
@@ -411,7 +417,13 @@ export function useGameLoop() {
     setState(s => ({ ...s, currentEvent: event, showEventScreen: false }));
 
     if (event.type === 'challenge') {
-      setState(s => ({ ...s, showChallengeUI: true }));
+      const partner = activeCast[Math.floor(Math.random() * activeCast.length)];
+      setState(s => ({
+        ...s,
+        showChallengeUI: true,
+        challengeNPCId: partner?.id ?? '',
+        challengeNPCName: partner?.name ?? '',
+      }));
     } else if (event.type === 'date') {
       const npc = activeCast.find(c => event.involvedNPCs.includes(c.id));
       const dateNpc = npc || activeCast[0];
@@ -460,15 +472,16 @@ export function useGameLoop() {
 
   // Challenge complete
   const handleChallengeComplete = useCallback((score: number, tier: string) => {
-    const reward = getRelationshipReward(tier as 'bronze' | 'silver' | 'gold');
-    activeCast.forEach(npc => {
-      relStore.changeRelationship(npc.id, Math.round(reward * 0.5));
+    const delta = getRelationshipReward(tier as 'bronze' | 'silver' | 'gold');
+    setState(s => {
+      if (s.challengeNPCId) {
+        relStore.changeRelationship(s.challengeNPCId, delta);
+      }
+      return { ...s, showChallengeUI: false, currentEvent: null };
     });
     if (tier === 'gold') playerStore.incrementChallengesWon();
-
     gameStore.completeEvent();
-    setState(s => ({ ...s, showChallengeUI: false, currentEvent: null }));
-  }, [activeCast, relStore, playerStore, gameStore]);
+  }, [relStore, playerStore, gameStore]);
 
   // Date complete
   const handleDateComplete = useCallback((chemistry: number) => {
@@ -563,10 +576,47 @@ export function useGameLoop() {
       takenIds.add(chosenId);
     }
 
-    const chosen = new Set(results.map(r => r.partnerId).filter(Boolean));
-    const eliminated = activeCast
-      .filter(npc => !chosen.has(npc.id) && !results.find(r => r.npcId === npc.id && r.partnerId !== null))
-      .map(npc => npc.id);
+    // Fix up: if more than 1 NPC ended up unpaired, pair extras together
+    // so at most 1 is left without a partner each week.
+    const unpairedFixup = results.filter(r => r.partnerId === null && r.npcId !== 'player');
+    while (unpairedFixup.length >= 2) {
+      const a = unpairedFixup.pop()!;
+      const b = unpairedFixup.pop()!;
+      const entryA = results.find(r => r.npcId === a.npcId)!;
+      const entryB = results.find(r => r.npcId === b.npcId)!;
+      entryA.partnerId = b.npcId;
+      entryB.partnerId = a.npcId;
+    }
+
+    // Determine who gets eliminated — bias toward NPCs with the most
+    // neutral relationships (lowest |relationship|). Strong feelings
+    // (love or hate) keep you on the island.
+    const unpaired = activeCast.filter(npc => {
+      const hasPartner = results.find(r => r.npcId === npc.id && r.partnerId !== null);
+      const wasChosen = results.some(r => r.partnerId === npc.id);
+      return !hasPartner && !wasChosen;
+    });
+
+    // If nobody is naturally unpaired, force-eliminate the NPC with
+    // the most neutral player relationship (lowest absolute value)
+    let eliminated: string[];
+    if (unpaired.length > 0) {
+      // Only eliminate ONE — the most neutral (lowest |relationship|)
+      unpaired.sort((a, b) =>
+        Math.abs(relStore.relationships[a.id] ?? 0) - Math.abs(relStore.relationships[b.id] ?? 0)
+      );
+      eliminated = [unpaired[0].id];
+    } else if (activeCast.length > 2) {
+      // Pick the NPC with the weakest relationship (closest to 0)
+      // Exclude the player's chosen partner
+      const candidates = activeCast.filter(c => c.id !== npcId);
+      candidates.sort((a, b) =>
+        Math.abs(relStore.relationships[a.id] ?? 0) - Math.abs(relStore.relationships[b.id] ?? 0)
+      );
+      eliminated = [candidates[0].id];
+    } else {
+      eliminated = [];
+    }
 
     eliminated.forEach(id => relStore.eliminate(id));
 
@@ -578,14 +628,28 @@ export function useGameLoop() {
     }));
   }, [activeCast, relStore]);
 
-  // Continue from ceremony results
+  // Continue from ceremony — handles results -> departure -> demo_end
   const continueCeremony = useCallback(() => {
+    // From results phase, go to departure screen if anyone was eliminated
+    if (state.ceremonyPhase === 'results' && state.eliminatedThisCeremony.length > 0) {
+      setState(s => ({ ...s, ceremonyPhase: 'departure' }));
+      return;
+    }
+
+    // From departure, show demo end screen
+    if (state.ceremonyPhase === 'departure') {
+      setState(s => ({ ...s, ceremonyPhase: 'demo_end' }));
+      return;
+    }
+
+    // From demo end (or results with no eliminations), go back to main menu
     setState(s => ({
       ...s,
       showCeremonyUI: false,
       ceremonyPhase: 'choosing',
       ceremonyResults: [],
       eliminatedThisCeremony: [],
+      showMainMenu: true,
     }));
 
     resetSeenDialogues();
@@ -600,7 +664,7 @@ export function useGameLoop() {
       briefingEvents: events.map(e => e.title),
       droppedItems: [],
     }));
-  }, [gameStore, activeCast, playerStore]);
+  }, [gameStore, activeCast, playerStore, state.ceremonyPhase, state.eliminatedThisCeremony]);
 
   // Producer phone
   const handleProducerPhone = useCallback((eventType: string) => {

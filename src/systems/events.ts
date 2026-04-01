@@ -133,9 +133,39 @@ export function generateDailyEvents(
 
   const events: GameEvent[] = [];
 
+  // Week 1, Day 1: fixed intro events for first-time experience
+  if (day === 1 && week === 1) {
+    const introTitles = ['Welcome to the Island', 'A Fresh Face', 'New Arrival'];
+    const introDescs = [
+      'Welcome the newest member of the island.',
+      'Someone new steps off the boat. First impressions matter!',
+      'A new islander has arrived and is ready to shake things up!',
+    ];
+    for (let i = 0; i < EVENTS_PER_DAY; i++) {
+      const npcs = pickRandomNPCs(cast, 2);
+      events.push({
+        id: makeEventId(day, week, i),
+        type: 'arrival',
+        title: introTitles[i],
+        description: introDescs[i],
+        energyCost: eventEnergyCost('arrival'),
+        location: 'Villa',
+        involvedNPCs: npcs.map(n => n.id),
+      });
+    }
+    return events;
+  }
+
+  // Guaranteed event type for certain days (1-indexed day within the week)
+  const dayInWeek = ((day - 1) % 7) + 1;
+  const guaranteedType: EventType | null =
+    (dayInWeek === 2 || dayInWeek === 4) ? 'challenge' :
+    (dayInWeek === 3 || dayInWeek === 5) ? 'date' :
+    null;
+
   // First event is always the "headline" type for the day
   const headlineType: EventType =
-    dayType === 'free' ? pickRandom(availableTypes) : availableTypes[0];
+    guaranteedType ?? (dayType === 'free' ? pickRandom(availableTypes) : availableTypes[0]);
 
   events.push(buildEvent(headlineType, day, week, 0, cast));
 

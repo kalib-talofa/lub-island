@@ -2,12 +2,13 @@
 
 import { useState } from "react";
 import { Character } from "@/characters/CharacterData";
+import { STARTING_CAST } from "@/characters/roster";
 
 interface CeremonyUIProps {
   cast: Character[];
   relationships: Record<string, number>;
   onChoosePartner: (npcId: string) => void;
-  phase: "choosing" | "results";
+  phase: "choosing" | "results" | "departure" | "demo_end";
   results?: { npcId: string; partnerId: string | null }[];
   eliminated?: string[];
   onContinue: () => void;
@@ -152,6 +153,113 @@ export default function CeremonyUI({
     );
   }
 
+  // ---- DEPARTURE PHASE ----
+  if (phase === "departure") {
+    const eliminatedNPCs = (eliminated ?? [])
+      .map((id) => STARTING_CAST.find((c) => c.id === id))
+      .filter(Boolean) as Character[];
+
+    return (
+      <div className="fixed inset-0 z-50 flex flex-col bg-gradient-to-b from-gray-950 via-gray-900 to-indigo-950">
+        {/* Departure header */}
+        <div className="flex flex-col items-center gap-2 pt-12">
+          <span className="text-5xl">{"\u{1F6A2}"}</span>
+          <h1 className="text-2xl font-extrabold tracking-wider text-red-400">
+            Farewell
+          </h1>
+          <p className="px-8 text-center text-sm text-white/50">
+            The island says goodbye...
+          </p>
+        </div>
+
+        {/* Departing islanders */}
+        <div className="flex flex-1 flex-col items-center justify-center gap-6 px-6">
+          {eliminatedNPCs.map((npc) => (
+            <div key={npc.id} className="flex flex-col items-center gap-3">
+              <div
+                className="flex h-20 w-20 items-center justify-center rounded-full text-4xl shadow-lg"
+                style={{
+                  backgroundColor: npc.colorPalette.primary + "20",
+                  borderWidth: 3,
+                  borderColor: npc.colorPalette.primary + "60",
+                }}
+              >
+                {SPECIES_EMOJI[npc.species] ?? "\u{1F43E}"}
+              </div>
+              <span className="text-lg font-bold text-white">{npc.name}</span>
+              <p className="max-w-[240px] text-center text-sm italic text-white/40">
+                &ldquo;{npc.catchphrase}&rdquo;
+              </p>
+              <span className="text-xs font-medium uppercase tracking-widest text-red-400/60">
+                Has left the island
+              </span>
+            </div>
+          ))}
+
+          {/* Divider */}
+          <div className="my-2 h-px w-48 bg-white/10" />
+
+          {/* New arrival teaser */}
+          <div className="flex flex-col items-center gap-3">
+            <p className="text-xs font-bold uppercase tracking-widest text-amber-400/70">
+              But wait...
+            </p>
+            <div className="flex h-20 w-20 items-center justify-center rounded-full border-2 border-dashed border-amber-400/40 bg-black text-4xl shadow-lg shadow-amber-500/10">
+              <span style={{ filter: "brightness(0)" }}>{"\u{1F43E}"}</span>
+            </div>
+            <p className="text-sm font-semibold text-amber-300">
+              A new islander is arriving soon...
+            </p>
+            <p className="text-xs text-white/30">
+              Who could it be?
+            </p>
+          </div>
+        </div>
+
+        {/* Continue button */}
+        <div className="px-4 pb-6">
+          <button
+            onClick={onContinue}
+            className="min-h-[52px] w-full rounded-2xl bg-gradient-to-r from-amber-500 to-yellow-500 py-3.5 text-lg font-bold text-black shadow-lg transition-all hover:scale-[1.02] active:scale-95"
+          >
+            Continue to Next Week
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ---- DEMO END PHASE ----
+  if (phase === "demo_end") {
+    return (
+      <div className="fixed inset-0 z-50 flex flex-col bg-gradient-to-b from-amber-950 via-gray-900 to-gray-950">
+        <div className="flex flex-1 flex-col items-center justify-center gap-6 px-8">
+          <span className="text-6xl">{"\u{1F334}"}</span>
+          <h1 className="text-3xl font-extrabold tracking-wider text-amber-400">
+            Thanks for Playing!
+          </h1>
+          <p className="max-w-[300px] text-center text-base leading-relaxed text-white/60">
+            That&apos;s the end of the demo. More weeks, new islanders, and
+            bigger drama are coming soon!
+          </p>
+          <div className="my-2 h-px w-48 bg-white/10" />
+          <p className="text-sm text-white/40">
+            Lub Island — Early Prototype
+          </p>
+        </div>
+
+        <div className="px-4 pb-6">
+          <button
+            onClick={onContinue}
+            className="min-h-[52px] w-full rounded-2xl bg-gradient-to-r from-amber-500 to-yellow-500 py-3.5 text-lg font-bold text-black shadow-lg transition-all hover:scale-[1.02] active:scale-95"
+          >
+            Back to Menu
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   // ---- RESULTS PHASE ----
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-gradient-to-b from-gray-950 via-gray-900 to-amber-950">
@@ -238,7 +346,7 @@ export default function CeremonyUI({
             </h3>
             <div className="space-y-2">
               {eliminated.map((id) => {
-                const npc = cast.find((c) => c.id === id);
+                const npc = STARTING_CAST.find((c) => c.id === id);
                 if (!npc) return null;
                 return (
                   <div

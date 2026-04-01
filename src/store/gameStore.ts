@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { GamePhase, EventType } from '@/characters/CharacterData';
 import { DAYS_PER_WEEK, EVENTS_PER_DAY } from '@/game/constants';
+import { isCeremonyDay } from '@/systems/calendar';
 
 interface GameStore {
   phase: GamePhase;
@@ -50,9 +51,11 @@ export const useGameStore = create<GameStore>((set) => ({
   advanceDay: () => set((s) => {
     const newDay = s.day + 1;
     if (newDay > DAYS_PER_WEEK) {
-      return { day: 1, week: s.week + 1, eventsRemaining: EVENTS_PER_DAY, eventsCompleted: 0, isNight: false, phase: 'MORNING_BRIEFING', currentEventType: null };
+      const events = isCeremonyDay(1) ? 0 : EVENTS_PER_DAY;
+      return { day: 1, week: s.week + 1, eventsRemaining: events, eventsCompleted: 0, isNight: false, phase: 'MORNING_BRIEFING', currentEventType: null };
     }
-    return { day: newDay, eventsRemaining: EVENTS_PER_DAY, eventsCompleted: 0, isNight: false, phase: 'MORNING_BRIEFING', currentEventType: null };
+    const events = isCeremonyDay(newDay) ? 0 : EVENTS_PER_DAY;
+    return { day: newDay, eventsRemaining: events, eventsCompleted: 0, isNight: false, phase: 'MORNING_BRIEFING', currentEventType: null };
   }),
 
   advanceToNight: () => set({ phase: 'NIGHTTIME_FREE', isNight: true, eventsRemaining: 0, currentEventType: null }),

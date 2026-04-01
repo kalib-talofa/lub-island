@@ -1,7 +1,7 @@
 'use client';
 
 import { Canvas } from '@react-three/fiber';
-import { Suspense, useCallback, useEffect, useRef } from 'react';
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import Island from '@/scene/Island';
 import { useGameLoop } from './GameLoop';
 import { useGameStore } from '@/store/gameStore';
@@ -23,6 +23,7 @@ import SleepTransition from '@/ui/SleepTransition';
 import ItemPopup from '@/ui/ItemPopup';
 import ProducerPhone from '@/ui/ProducerPhone';
 import InventoryUI from '@/ui/InventoryUI';
+import StatBreakdown from '@/ui/StatBreakdown';
 import { canAfford } from '@/systems/energy';
 import { audioManager } from '@/utils/audio';
 import { cameraAngleRef } from '@/scene/IsometricCamera';
@@ -64,6 +65,7 @@ export default function Game() {
     handleItemPickup,
   } = useGameLoop();
 
+  const [showStatBreakdown, setShowStatBreakdown] = useState(false);
   const showFreeRoamUI = gameStore.phase === 'DAYTIME_FREE' || gameStore.phase === 'NIGHTTIME_FREE';
 
   // ---------------------------------------------------------------------------
@@ -212,7 +214,7 @@ export default function Game() {
         {/* HUD */}
         {showFreeRoamUI && (
           <div style={{ pointerEvents: 'auto' }}>
-            <HUD onOpenInventory={openInventory} />
+            <HUD onOpenInventory={openInventory} onStatsTap={() => setShowStatBreakdown(true)} />
           </div>
         )}
 
@@ -255,6 +257,15 @@ export default function Game() {
                 {state.dailyEvents.length - gameStore.eventsRemaining}/{state.dailyEvents.length}
               </span>
             </div>
+
+            {/* Free day message (ceremony day) */}
+            {state.dailyEvents.length === 0 && (
+              <p className="text-center text-[11px] font-medium text-amber-200/80"
+                style={{ textShadow: '0 1px 4px rgba(0,0,0,0.7)', padding: '8px 0' }}
+              >
+                {"\u2728"} Free day — tie up loose ends before the ceremony!
+              </p>
+            )}
 
             {/* Event buttons */}
             {state.dailyEvents.map((evt, i) => {
@@ -543,6 +554,8 @@ export default function Game() {
             <ChallengeUI
               performance={bio.performance}
               onComplete={handleChallengeComplete}
+              partnerNPCId={state.challengeNPCId}
+              partnerNPCName={state.challengeNPCName}
             />
           </div>
         )}
@@ -589,6 +602,22 @@ export default function Game() {
             <ProducerPhone
               onChooseEvent={handleProducerPhone}
               onClose={() => {}}
+            />
+          </div>
+        )}
+
+        {/* Stat Breakdown */}
+        {showStatBreakdown && (
+          <div style={{ pointerEvents: 'auto' }}>
+            <StatBreakdown
+              sleepHours={bio.sleepHours}
+              sleepQuality={bio.sleepQuality}
+              activeMinutes={bio.activeMinutes}
+              stepCount={bio.stepCount}
+              energy={bio.energy}
+              charm={bio.charm}
+              performance={bio.performance}
+              onClose={() => setShowStatBreakdown(false)}
             />
           </div>
         )}

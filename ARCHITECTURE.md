@@ -84,17 +84,18 @@ src/
     MainMenu.tsx                -- Start screen
     MorningBriefing.tsx         -- Day-start summary overlay
     EventScreen.tsx             -- Event preview (title, description, energy cost, start/close)
-    ChallengeUI.tsx             -- Coconut Catch mini-game
+    ChallengeUI.tsx             -- Coconut Catch mini-game; displays random NPC partner banner during play and relationship delta on results screen
     DateUI.tsx                  -- Date sequence UI
-    CeremonyUI.tsx              -- Partner choosing + elimination results
+    CeremonyUI.tsx              -- Partner choosing + results + departure + demo end phases
+    StatBreakdown.tsx           -- Shared stat breakdown popup (used in MorningBriefing and HUD)
     SleepTransition.tsx         -- Night-to-morning fade
     ItemPopup.tsx               -- Generic popup (also used for "too tired" warning)
-    InventoryUI.tsx               -- Bag/inventory grid overlay (unlimited items, use/gift actions)
+    InventoryUI.tsx               -- Backpack overlay: Vibes section (NPC relationship bars + tier labels) above Items section (unlimited inventory, use/gift actions)
     ProducerPhone.tsx           -- Producer phone event picker
 
   utils/
     ink.ts                      -- DialogueRunner class, DialogueScript/DialogueLine/DialogueChoice types
-    audio.ts                    -- Audio helpers (Howler wrapper)
+    audio.ts                    -- AudioManager: day/night music (Howler.js), synthesized SFX (typewriter tick, button tap), mute toggle
     math.ts                     -- Math utilities
 
   dev/
@@ -119,7 +120,7 @@ src/
 
 ### Viewport
 
-The page (`page.tsx`) sets `<main>` to `100vw x 100vh`, `overflow: hidden`, `background: #1a1a2e`. Both `<Game />` and `<DevToolbar />` are loaded via `next/dynamic` with `ssr: false` to avoid Three.js SSR issues.
+The page (`page.tsx`) sets `<main>` to `100vw x 100vh`, `overflow: hidden`, `background: #1a1a2e`. Both `<Game />` and `<DevToolbar />` are loaded via `next/dynamic` with `ssr: false` to avoid Three.js SSR issues. The `.game-viewport` CSS class uses `position: fixed; left: 0`, anchoring it to the left edge of the viewport rather than centering it.
 
 ---
 
@@ -258,7 +259,7 @@ Lights in scene:
 
 ### Environment (`IslandEnvironment.tsx`)
 
-Procedural geometry (no loaded models). Exports `ZONE_POSITIONS`:
+Exports `ZONE_POSITIONS`:
 
 ```ts
 ZONE_POSITIONS: Record<string, [number, number, number]> = {
@@ -272,7 +273,12 @@ ZONE_POSITIONS: Record<string, [number, number, number]> = {
 };
 ```
 
-Contains sub-components for PalmTree, SimpleTree, Rock, and all zone structures (Villa, Arena podium, Garden fountain + benches, Lookout mound, Beach umbrellas, Dock, etc.). Ground is a large flat cylinder. Water plane surrounds the island.
+Contains sub-components for PalmTree, SimpleTree, Rock, and all zone structures (Villa, Arena podium, Garden fountain + benches, Lookout mound, Beach umbrellas, Dock, etc.).
+
+**Textures and models:**
+- Ground and zone surfaces use PBR textures loaded via a `useConfiguredTexture(path, [repeatX, repeatY])` hook defined in this file. The hook wraps `useTexture` from drei and sets `colorSpace = SRGBColorSpace`, `wrapS/T = RepeatWrapping`, `repeat`, and `needsUpdate` on the loaded texture. Textured components must be wrapped in `<Suspense fallback={null}>`.
+- Tree models are GLB files (`TropicalTree.glb`, `EvergreenTree.glb`) loaded via `useGLTF`, with `scene.clone()` called per instance to avoid shared state.
+- The ocean plane uses a `Water.png` texture with animated UV offset scrolling each frame.
 
 ---
 
@@ -348,6 +354,10 @@ Two layers:
 ### Player mesh (DogCharacter)
 
 Primitive geometry: cylinder body (#D4A05A), sphere head, cone ears (#B8863A), sphere eyes (#1A1A1A), sphere nose (#3A2518).
+
+### Night lantern
+
+During `NIGHTTIME_FREE`, `PlayerController` reads `phase` from `useGameStore` and renders a `<pointLight color="#ffe8a0" intensity={6} distance={8}>` as a child of the player group, creating a lantern glow effect that moves with the player.
 
 ---
 
@@ -794,4 +804,4 @@ interface BiometricData {
 | File | Purpose |
 |---|---|
 | `src/scene/ItemPickups.tsx`     | 3D item pickup objects with glow and auto-collect    |
-| `src/ui/InventoryUI.tsx`        | Bag inventory grid UI                                |
+| `src/ui/InventoryUI.tsx`        | Backpack overlay: Vibes (relationship bars) + Items sections |

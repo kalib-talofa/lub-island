@@ -49,6 +49,7 @@ The dev toolbar is a `lil-gui` panel rendered by `src/dev/DevToolbar.tsx`. It oc
   - **Character Journals** subfolder: buttons to add each NPC's journal.
   - **Clear Inventory** button to empty the bag.
   - **Items in Bag** count display (auto-refreshes).
+- **Night Drops** -- Read-only display showing player X/Z coordinates and up to 4 spawned night item locations (name + coordinates or 'Villa (indoors)'). Updates every 500ms.
 
 ### WASD Keyboard Movement
 
@@ -66,7 +67,7 @@ Toggle via the dev toolbar checkbox. Sets `energy`, `charm`, and `performance` a
 ### Day/Night Advance
 
 Use the Game Controls folder in the dev toolbar:
-- **Advance to Night** -- skips to NIGHTTIME_FREE phase.
+- **Advance to Night** -- skips to NIGHTTIME_FREE phase and triggers the nightly item spawn (via `triggerNightSpawnRef`).
 - **Advance to Next Day** -- increments the day counter and resets to MORNING_BRIEFING.
 - **Advance to Ceremony** -- jumps to CEREMONY phase.
 - **Reset Week** -- resets back to day 1.
@@ -278,6 +279,22 @@ function PalmTree({ position }: { position: [number, number, number] }) {
 3. For models used many times, consider drei's `<Instances>` or `<Merged>` for draw call batching.
 4. Preload with `useGLTF.preload('/models/palm_tree.glb')` at module level.
 
+### Use PBR Textures
+
+For PBR textured meshes, use the `useConfiguredTexture(path, [repeatX, repeatY])` helper defined in `src/scene/IslandEnvironment.tsx`. It wraps `useTexture` from drei and correctly sets `colorSpace`, `wrapS/T`, `repeat`, and `needsUpdate`. Always wrap textured components in `<Suspense fallback={null}>`.
+
+```tsx
+import { Suspense } from 'react';
+
+function TexturedGround() {
+  const texture = useConfiguredTexture('/textures/grass.png', [8, 8]);
+  return <mesh><planeGeometry /><meshStandardMaterial map={texture} /></mesh>;
+}
+
+// In parent:
+<Suspense fallback={null}><TexturedGround /></Suspense>
+```
+
 ---
 
 ## 5. Known Issues and Limitations
@@ -287,8 +304,8 @@ function PalmTree({ position }: { position: [number, number, number] }) {
 - **Social events auto-complete.** Social events trigger NPC dialogue then immediately complete. They should have their own dedicated dialogue flow.
 - **Nightly item drop positions are not structure-aware.** Nightly item drops may occasionally spawn inside structure colliders (buildings, fountains). Items are positioned with random offsets from zone centres and clamped to the island radius, but no structure collision check is performed on drop positions.
 - **Date dialogue coverage.** Date-specific dialogues only exist for Rosie and Kiki. Other NPCs fall back to regular chat scripts.
-- **Ceremony NPC logic.** The ceremony NPC decision doesn't account for existing NPC-to-NPC relationships when determining outcomes.
-- **Audio system is stubbed.** Howler is installed but no actual audio files are loaded. The audio system is placeholder only.
+- **Ceremony NPC logic.** The ceremony NPC decision doesn't account for existing NPC-to-NPC relationships. Elimination biases toward the most neutral player relationship (lowest absolute value). Exactly 1 NPC is eliminated per ceremony. The prototype ends after the first ceremony with a demo end screen.
+- **Audio requires MP3 files.** Day and night music require `public/DayMusic.mp3` and `public/NightMusic.mp3`. If missing, music won't play but the game functions normally. SFX are synthesized via Web Audio API and don't need files.
 - **AI API routes return mock data.** No Anthropic API integration yet. The API routes serve static/random mock responses.
 - **New arrival event is non-functional.** The arrival event type exists but doesn't actually add a new NPC to the game world.
 - **Collider approximations.** Structure colliders are circles. Box-shaped structures (like the Villa) use one or more circles to approximate their footprint. Some overlap/gaps are expected.
@@ -362,5 +379,7 @@ src/
 | `src/store/gameStore.ts`          | Game phase, day counter, events                  |
 | `src/dev/DevToolbar.tsx`          | lil-gui dev panel                                |
 | `src/scene/ItemPickups.tsx`       | 3D item pickup objects with glow and auto-collect |
-| `src/ui/InventoryUI.tsx`          | Unlimited bag inventory grid UI                  |
+| `src/ui/InventoryUI.tsx`          | Backpack UI: Vibes (relationship bars) + Items sections |
+| `src/ui/StatBreakdown.tsx`        | Shared stat breakdown popup (biometrics + formulas) |
+| `src/utils/audio.ts`             | AudioManager: music playback, SFX, mute toggle  |
 | `src/ui/VirtualJoystick.tsx`      | Touch/mouse joystick input                       |

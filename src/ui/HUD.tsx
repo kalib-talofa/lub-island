@@ -9,9 +9,10 @@ import { audioManager } from "@/utils/audio";
 
 interface HUDProps {
   onOpenInventory?: () => void;
+  onStatsTap?: () => void;
 }
 
-export default function HUD({ onOpenInventory }: HUDProps) {
+export default function HUD({ onOpenInventory, onStatsTap }: HUDProps) {
   const { day, isNight, eventsCompleted, phase } = useGameStore();
   const { energy, charm, performance } = useBiometricStore();
   const { inventory, performanceBoostToday } = usePlayerStore();
@@ -28,7 +29,11 @@ export default function HUD({ onOpenInventory }: HUDProps) {
   return (
     <div className="pointer-events-none fixed inset-x-0 top-0 z-50 flex flex-col gap-1.5 px-6 py-3">
       {/* Row 1: Day / Time + Stats */}
-      <div className="pointer-events-auto flex items-center gap-2 rounded-xl bg-black/60 px-6 py-2 backdrop-blur-sm">
+      <div
+        className="pointer-events-auto flex items-center gap-2 rounded-xl bg-black/60 py-2 backdrop-blur-sm cursor-pointer active:bg-black/70 transition-colors"
+        style={{ paddingLeft: '24px', paddingRight: '16px' }}
+        onClick={onStatsTap}
+      >
         {/* Day & time icon */}
         <div className="flex items-center gap-1.5 text-sm font-bold text-white">
           <span className="text-base">{isNight ? "\u{1F319}" : "\u{2600}\u{FE0F}"}</span>
@@ -78,23 +83,13 @@ export default function HUD({ onOpenInventory }: HUDProps) {
           </span>
         </div>
 
-        <div className="mx-1 h-5 w-px bg-white/30" />
-
-        {/* Audio toggle */}
-        <button
-          onClick={() => setMuted(audioManager.toggleMute())}
-          className="flex h-7 w-7 items-center justify-center rounded-full text-base transition hover:bg-white/20 active:scale-90"
-          title={muted ? "Unmute" : "Mute"}
-        >
-          {muted ? "\u{1F507}" : "\u{1F50A}"}
-        </button>
       </div>
 
       {/* Row 2: Event dots + Bag button */}
       <div className="pointer-events-auto flex items-center gap-2 rounded-xl bg-black/50 px-6 py-1.5 backdrop-blur-sm">
         {/* Event dots */}
         <div className="flex items-center gap-1.5">
-          <span className="text-[10px] font-medium uppercase tracking-wider text-white/60">
+          <span className="text-[10px] font-medium uppercase tracking-wider text-white/60" style={{ marginLeft: '10px' }}>
             Events
           </span>
           {Array.from({ length: totalEvents }).map((_, i) => (
@@ -117,7 +112,7 @@ export default function HUD({ onOpenInventory }: HUDProps) {
           className="relative flex h-12 min-w-[180px] items-center justify-center gap-2 rounded-xl border border-white/20 bg-white/10 px-8 transition hover:bg-white/20 active:scale-95"
         >
           <span className="text-xl">{"\u{1F392}"}</span>
-          <span className="text-sm font-semibold text-white/80">Inventory</span>
+          <span className="text-sm font-semibold text-white/80">Backpack</span>
           {itemCount > 0 && (
             <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-500 px-1 text-xs font-bold text-black">
               {itemCount}
@@ -135,6 +130,15 @@ export default function HUD({ onOpenInventory }: HUDProps) {
           </span>
         </div>
       )}
+
+      {/* Audio toggle */}
+      <button
+        onClick={() => setMuted(audioManager.toggleMute())}
+        className="pointer-events-auto flex h-8 w-8 items-center justify-center self-start rounded-full bg-black/50 text-base backdrop-blur-sm transition hover:bg-black/60 active:scale-90"
+        title={muted ? "Unmute" : "Mute"}
+      >
+        {muted ? "\u{1F507}" : "\u{1F50A}"}
+      </button>
     </div>
   );
 }

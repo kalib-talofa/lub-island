@@ -1,11 +1,29 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { COCONUT_CATCH } from "@/game/constants";
+import { COCONUT_CATCH, RELATIONSHIP } from "@/game/constants";
 import { getCoconutFallSpeed, getCatchRadius, getScoreTier } from "@/systems/challenge";
+
+const NPC_EMOJI: Record<string, string> = {
+  rosie:    "\u{1F430}",
+  blaze:    "\u{1F98A}",
+  pudge:    "\u{1F43B}",
+  kiki:     "\u{1F431}",
+  sprocket: "\u{1F427}",
+  lily:     "\u{1F438}",
+};
+
+// Relationship delta per tier — mirrors constants but bronze is negative
+const TIER_DELTA: Record<string, number> = {
+  gold:   RELATIONSHIP.CHALLENGE_GOLD,
+  silver: RELATIONSHIP.CHALLENGE_SILVER,
+  bronze: RELATIONSHIP.CHALLENGE_BRONZE,
+};
 
 interface ChallengeUIProps {
   performance: number;
+  partnerNPCId: string;
+  partnerNPCName: string;
   onComplete: (score: number, tier: string) => void;
 }
 
@@ -17,11 +35,11 @@ interface Coconut {
   caught: boolean;
 }
 
-export default function ChallengeUI({ performance, onComplete }: ChallengeUIProps) {
+export default function ChallengeUI({ performance, partnerNPCId, partnerNPCName, onComplete }: ChallengeUIProps) {
   const [gameState, setGameState] = useState<"playing" | "results">("playing");
   const [score, setScore] = useState(0);
   const [timeLeft, setTimeLeft] = useState<number>(COCONUT_CATCH.DURATION_SECONDS);
-  const [basketX, setBasketX] = useState(50); // percentage
+  const [basketX, setBasketX] = useState(50);
   const [coconuts, setCoconuts] = useState<Coconut[]>([]);
   const [flashEffect, setFlashEffect] = useState(false);
 
@@ -37,7 +55,6 @@ export default function ChallengeUI({ performance, onComplete }: ChallengeUIProp
   const catchRadius = getCatchRadius(performance);
   const basketWidthPx = catchRadius * 2;
 
-  // Handle pointer movement for basket
   const handlePointerMove = useCallback(
     (clientX: number) => {
       if (!gameAreaRef.current || gameState !== "playing") return;
@@ -76,12 +93,11 @@ export default function ChallengeUI({ performance, onComplete }: ChallengeUIProp
       lastTimeRef.current = now;
       spawnTimerRef.current += delta * 1000;
 
-      // Spawn coconuts
       if (spawnTimerRef.current >= COCONUT_CATCH.SPAWN_INTERVAL_MS) {
         spawnTimerRef.current -= COCONUT_CATCH.SPAWN_INTERVAL_MS;
         const newCoconut: Coconut = {
           id: coconutIdRef.current++,
-          x: 10 + Math.random() * 80, // percentage
+          x: 10 + Math.random() * 80,
           y: 0,
           speed: fallSpeed + (Math.random() - 0.5) * 0.5,
           caught: false,
@@ -89,7 +105,6 @@ export default function ChallengeUI({ performance, onComplete }: ChallengeUIProp
         coconutsRef.current = [...coconutsRef.current, newCoconut];
       }
 
-      // Update coconut positions
       coconutsRef.current = coconutsRef.current
         .map((c) => ({ ...c, y: c.y + c.speed * delta * 60 }))
         .filter((c) => c.y < 105 && !c.caught);
@@ -109,7 +124,6 @@ export default function ChallengeUI({ performance, onComplete }: ChallengeUIProp
     const caught: number[] = [];
     coconutsRef.current.forEach((c) => {
       if (c.caught) return;
-      // Check if coconut is in basket zone (bottom 12% of screen, within basket X range)
       if (c.y >= 82 && c.y <= 95) {
         const basketLeftPct = basketX - (basketWidthPx / 3.5);
         const basketRightPct = basketX + (basketWidthPx / 3.5);
@@ -131,37 +145,68 @@ export default function ChallengeUI({ performance, onComplete }: ChallengeUIProp
   }, [coconuts, basketX, basketWidthPx, gameState]);
 
   const tier = getScoreTier(score);
+  const relDelta = TIER_DELTA[tier] ?? 0;
 
   const tierInfo = {
     bronze: { label: "Bronze", emoji: "\u{1F949}", color: "text-orange-400" },
     silver: { label: "Silver", emoji: "\u{1F948}", color: "text-gray-300" },
-    gold: { label: "Gold", emoji: "\u{1F947}", color: "text-yellow-400" },
+    gold:   { label: "Gold",   emoji: "\u{1F947}", color: "text-yellow-400" },
   };
 
+  // ── Results screen ─────────────────────────────────────────────────────────
   if (gameState === "results") {
     const info = tierInfo[tier];
+    const partnerEmoji = NPC_EMOJI[partnerNPCId] ?? "\u{1F464}";
+    const deltaPositive = relDelta >= 0;
+
     return (
       <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-gradient-to-b from-amber-900 to-stone-900">
-        <div className="flex flex-col items-center gap-4 rounded-3xl bg-black/50 p-8 shadow-2xl backdrop-blur-sm">
+        <div className="flex flex-col items-center gap-4 rounded-3xl bg-black/50 p-8 shadow-2xl backdrop-blur-sm" style={{ minWidth: 280 }}>
           <div className="text-6xl">{info.emoji}</div>
           <h2 className="text-3xl font-bold text-white">Challenge Complete!</h2>
+
           <div className="flex items-center gap-2">
             <span className="text-5xl font-extrabold text-white">{score}</span>
             <span className="text-lg text-white/60">coconuts</span>
           </div>
+
           <div className={`text-xl font-bold ${info.color}`}>
             {info.label} Tier
           </div>
-          <div className="mt-2 text-sm text-white/40">
-            {score >= COCONUT_CATCH.GOLD_THRESHOLD
+
+          <div className="text-sm text-white/40">
+            {tier === "gold"
               ? "Amazing catch!"
-              : score >= COCONUT_CATCH.SILVER_THRESHOLD
+              : tier === "silver"
                 ? "Great job!"
-                : "Not bad, keep practicing!"}
+                : "You let your partner down\u2026"}
           </div>
+
+          {/* Relationship delta */}
+          {partnerNPCName && (
+            <div
+              className="mt-1 flex w-full items-center justify-between gap-3 rounded-2xl border px-5 py-3"
+              style={{
+                background: deltaPositive ? "rgba(16,185,129,0.12)" : "rgba(239,68,68,0.12)",
+                borderColor: deltaPositive ? "rgba(52,211,153,0.3)" : "rgba(248,113,113,0.3)",
+              }}
+            >
+              <div className="flex items-center gap-2 text-sm font-semibold text-white/80">
+                <span className="text-xl">{partnerEmoji}</span>
+                <span>{partnerNPCName}</span>
+              </div>
+              <span
+                className="text-lg font-extrabold tabular-nums"
+                style={{ color: deltaPositive ? "#34d399" : "#f87171" }}
+              >
+                {deltaPositive ? `+${relDelta}` : relDelta}
+              </span>
+            </div>
+          )}
+
           <button
             onClick={() => onComplete(score, tier)}
-            className="mt-4 min-h-[48px] w-full rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 px-8 py-3 text-lg font-bold text-white shadow-lg transition-all hover:scale-[1.02] active:scale-95"
+            className="mt-2 min-h-[48px] w-full rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 px-8 py-3 text-lg font-bold text-white shadow-lg transition-all hover:scale-[1.02] active:scale-95"
           >
             Continue
           </button>
@@ -170,6 +215,7 @@ export default function ChallengeUI({ performance, onComplete }: ChallengeUIProp
     );
   }
 
+  // ── Playing screen ─────────────────────────────────────────────────────────
   return (
     <div className="fixed inset-0 z-50 select-none overflow-hidden bg-gradient-to-b from-sky-400 via-sky-300 to-amber-200">
       {/* HUD bar */}
@@ -178,20 +224,29 @@ export default function ChallengeUI({ performance, onComplete }: ChallengeUIProp
           <span className="text-lg">{"\u{1F965}"}</span>
           <span className="text-xl font-bold text-white">{score}</span>
         </div>
-        <div className="text-center text-sm font-bold uppercase tracking-wider text-white/80">
+        <div className="text-xs font-bold uppercase tracking-wider text-white/80">
           Coconut Catch
         </div>
         <div className="flex items-center gap-1.5">
           <span className="text-sm">{"\u23F1\u{FE0F}"}</span>
-          <span
-            className={`text-xl font-bold ${
-              timeLeft <= 5 ? "animate-pulse text-red-400" : "text-white"
-            }`}
-          >
+          <span className={`text-xl font-bold ${timeLeft <= 5 ? "animate-pulse text-red-400" : "text-white"}`}>
             {timeLeft}s
           </span>
         </div>
       </div>
+
+      {/* Partner banner */}
+      {partnerNPCName && (
+        <div className="absolute inset-x-0 top-[52px] z-10 flex justify-center">
+          <div className="flex items-center gap-3 rounded-2xl border border-white/20 bg-black/50 px-5 py-2.5 backdrop-blur-sm shadow-lg">
+            <span className="text-4xl">{NPC_EMOJI[partnerNPCId] ?? "\u{1F464}"}</span>
+            <div className="flex flex-col">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-white/50">Your Partner</span>
+              <span className="text-lg font-bold text-white">{partnerNPCName}</span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Game area */}
       <div
@@ -204,44 +259,29 @@ export default function ChallengeUI({ performance, onComplete }: ChallengeUIProp
         }}
         style={{ touchAction: "none" }}
       >
-        {/* Catch flash effect */}
         {flashEffect && (
           <div className="pointer-events-none absolute inset-0 z-20 bg-yellow-300/20" />
         )}
 
-        {/* Coconuts */}
         {coconuts.map((c) => (
           <div
             key={c.id}
             className="absolute flex h-8 w-8 -translate-x-1/2 items-center justify-center text-2xl"
-            style={{
-              left: `${c.x}%`,
-              top: `${c.y}%`,
-            }}
+            style={{ left: `${c.x}%`, top: `${c.y}%` }}
           >
             {"\u{1F965}"}
           </div>
         ))}
 
-        {/* Basket */}
         <div
           className="absolute bottom-[8%] -translate-x-1/2 flex items-center justify-center rounded-xl border-2 border-amber-800 bg-gradient-to-b from-amber-600 to-amber-800 shadow-lg"
-          style={{
-            left: `${basketX}%`,
-            width: `${basketWidthPx}px`,
-            height: "36px",
-          }}
+          style={{ left: `${basketX}%`, width: `${basketWidthPx}px`, height: "36px" }}
         >
           <span className="text-lg">{"\u{1F9FA}"}</span>
         </div>
 
-        {/* Palm tree decorations */}
-        <div className="pointer-events-none absolute bottom-0 left-2 text-4xl opacity-30">
-          {"\u{1F334}"}
-        </div>
-        <div className="pointer-events-none absolute bottom-0 right-2 text-4xl opacity-30">
-          {"\u{1F334}"}
-        </div>
+        <div className="pointer-events-none absolute bottom-0 left-2 text-4xl opacity-30">{"\u{1F334}"}</div>
+        <div className="pointer-events-none absolute bottom-0 right-2 text-4xl opacity-30">{"\u{1F334}"}</div>
       </div>
     </div>
   );

@@ -63,6 +63,17 @@ export default function EventScreen({
           {eventDescription}
         </p>
 
+        {/* Challenge partner notice */}
+        {eventType === "challenge" && (
+          <div className="flex w-full items-center gap-3 rounded-xl border border-indigo-400/30 bg-indigo-500/10 px-4 py-3">
+            <span className="text-2xl">{"\u{1F91D}"}</span>
+            <div className="flex flex-col gap-0.5">
+              <span className="text-xs font-bold uppercase tracking-wider text-indigo-300">Partner Challenge</span>
+              <span className="text-xs text-white/50">You'll be paired with a random islander. Do well to boost your relationship — do badly and lose it.</span>
+            </div>
+          </div>
+        )}
+
         {/* Energy cost */}
         <div
           className={`flex items-center gap-2 rounded-xl border px-4 py-2 ${

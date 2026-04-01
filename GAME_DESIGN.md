@@ -52,7 +52,7 @@ The game follows a daily cycle that repeats within a 7-day week:
   | SLEEP_TRANSITION |  <-- Day ends
   +--------+---------+
            |
-           +-------> If day == 7: CEREMONY --> CEREMONY_RESULT --> Next week
+           +-------> If day == 7: CEREMONY --> RESULTS --> DEPARTURE --> DEMO_END
            |
            +-------> Otherwise: MORNING_BRIEFING (next day)
 ```
@@ -84,7 +84,7 @@ There are **8 game phases** defined in `GamePhase`:
 - `NIGHTTIME_FREE` -> `SLEEP_TRANSITION` (go to sleep)
 - `SLEEP_TRANSITION` -> `MORNING_BRIEFING` (next day, if day < 7)
 - `SLEEP_TRANSITION` -> `CEREMONY` (if day == 7)
-- `CEREMONY` -> `CEREMONY_RESULT` -> `MORNING_BRIEFING` (week rolls over, day resets to 1)
+- `CEREMONY` (choosing) -> results -> departure -> demo_end -> `MAIN_MENU` (prototype; future: `MORNING_BRIEFING` for next week)
 
 ---
 
@@ -102,9 +102,15 @@ Each week is **7 days** (`DAYS_PER_WEEK = 7`). The `WEEKLY_SCHEDULE` determines 
 | 6 | `free` | Player's choice | `social`, `date`, `challenge` |
 | 7 | `ceremony` | Recoupling ceremony | No events (ceremony only) |
 
-On each non-ceremony day, 3 events are generated. The first event is always the "headline" type matching the day (e.g., a `challenge` event on challenge day). On `free` days, the headline is randomly chosen from available types. Remaining slots are filled randomly from available types.
+On each non-ceremony day, 3 events are generated. The first event slot follows these rules:
+- **Week 1, Day 1:** Fixed intro sequence: "Welcome to the Island", "A Fresh Face", "New Arrival" (all `arrival` type, always in this order).
+- **Days 2 & 4:** First event is always a `challenge`.
+- **Days 3 & 5:** First event is always a `date`.
+- **Other non-ceremony days:** The first event matches the day's headline type (e.g., `challenge` on challenge day). On `free` days, the headline is randomly chosen from available types.
 
-Ceremony days produce no events -- the entire day is the recoupling ceremony.
+Remaining event slots (2nd and 3rd) are filled randomly from available types.
+
+Ceremony days (Day 7) produce no events. The day is a free roam period with 0 required events -- the "Advance to Night" button is available immediately. The player can use items and talk to NPCs before the ceremony. The HUD shows "Free day -- tie up loose ends before the ceremony!" in place of event buttons. The ceremony triggers after sleeping on Day 7.
 
 ---
 
@@ -297,9 +303,9 @@ The CeremonyUI uses a simplified label set: "Cold" (< -25), "Distant" (-25 to -1
 | Date: Great chemistry (score >= 4) | +20 | `DATE_GREAT` |
 | Date: Good chemistry (score 2-3) | +10 | `DATE_GOOD` |
 | Date: Bad chemistry (score < 2) | -5 | `DATE_BAD` |
-| Challenge: Gold tier | +15 | `CHALLENGE_GOLD` (applied at 50% to all watching NPCs) |
-| Challenge: Silver tier | +10 | `CHALLENGE_SILVER` (applied at 50% to all watching NPCs) |
-| Challenge: Bronze tier | +5 | `CHALLENGE_BRONZE` (applied at 50% to all watching NPCs) |
+| Challenge: Gold tier | +15 | `CHALLENGE_GOLD` (applied to challenge partner only) |
+| Challenge: Silver tier | +8 | `CHALLENGE_SILVER` (applied to challenge partner only) |
+| Challenge: Bronze tier | -10 | `CHALLENGE_BRONZE` (penalty for poor performance, applied to challenge partner only) |
 | Night Chat Bonus | +3 | `NIGHT_CHAT_BONUS` |
 | Dialogue Choices | varies | Each dialogue choice has an `effects.relationship` value (typically +2 to +10) |
 
@@ -378,11 +384,13 @@ When the player has read an NPC's character journal, a `journal_unlocked` variab
 
 The primary challenge mini-game. A 2D catch game where coconuts fall from the top of the screen and the player moves a basket to catch them.
 
+At the start of the challenge, one **random NPC partner** is assigned. Performance affects the relationship with that partner only (not all watching NPCs). The partner is displayed prominently during gameplay as a large emoji with a name banner below the HUD. The relationship delta is shown on the results screen. The EventScreen preview for challenge events shows a "Partner Challenge" notice explaining the partner mechanic.
+
 **Parameters (from `COCONUT_CATCH`):**
 
 | Parameter | Value | Description |
 |---|---|---|
-| Duration | 30 seconds | `DURATION_SECONDS` |
+| Duration | 10 seconds | `DURATION_SECONDS` (demo build) |
 | Base fall speed | 3 | `BASE_FALL_SPEED` (units per frame) |
 | Performance speed modifier | 0.02 | `PERFORMANCE_SPEED_MODIFIER` -- per point of Performance, fall speed decreases |
 | Base catch radius | 40px | `BASE_CATCH_RADIUS` |
@@ -396,11 +404,11 @@ The primary challenge mini-game. A 2D catch game where coconuts fall from the to
 
 **Scoring Tiers:**
 
-| Tier | Coconuts Caught | Relationship Reward (to all watching NPCs, at 50%) |
+| Tier | Coconuts Caught | Relationship Reward (to challenge partner only) |
 |---|---|---|
-| Bronze | 5+ (`BRONZE_THRESHOLD`) | +5 * 0.5 = +2-3 per NPC |
-| Silver | 10+ (`SILVER_THRESHOLD`) | +10 * 0.5 = +5 per NPC |
-| Gold | 15+ (`GOLD_THRESHOLD`) | +15 * 0.5 = +7-8 per NPC |
+| Bronze | 5+ (`BRONZE_THRESHOLD`) | -10 (`CHALLENGE_BRONZE`, penalty) |
+| Silver | 10+ (`SILVER_THRESHOLD`) | +8 (`CHALLENGE_SILVER`) |
+| Gold | 15+ (`GOLD_THRESHOLD`) | +15 (`CHALLENGE_GOLD`) |
 
 Gold tier also increments the player's `challengesWon` counter.
 
@@ -468,15 +476,21 @@ The recoupling ceremony is a special phase, not a standard event.
      - `RANDOM_FACTOR_MIN` = 0.05, `RANDOM_FACTOR_MAX` = 0.15
      - Effective random range: 10 to 30 points
 
-3. **Elimination:** Any NPC that was not chosen by anyone (neither as a partner nor a chooser with a valid partner) is eliminated. Eliminated NPCs are removed from the active cast permanently.
+3. **Pairing Fix-up:** After the greedy pairing, if more than 1 NPC is left without a partner, extras are paired together. This ensures at most 1 NPC is unpaired per ceremony.
 
-4. **Results Phase:** Shows all pairings and eliminations. Advancing continues to Week N+1, Day 1.
+4. **Elimination:** Exactly **1 NPC is eliminated per ceremony**. If any NPC is unpaired (no partner), the unpaired NPC with the most neutral player relationship (lowest `|relationship|`) is eliminated. If all NPCs are paired, the NPC with the most neutral relationship (excluding the player's chosen partner) is force-eliminated. Strong feelings (love or hate) keep characters on the island. Eliminated NPCs are removed from the active cast permanently.
+
+5. **Results Phase:** Shows all pairings. Eliminated NPCs are shown in a "Farewell" section with greyed-out portraits. NPC data is looked up from `STARTING_CAST` (not `activeCast`) so eliminated characters still render correctly.
+
+6. **Departure Phase:** A farewell screen showing each eliminated NPC's portrait, name, and catchphrase, with a "Has left the island" label. Below, a teaser shows a blacked-out silhouette with "A new islander is arriving soon..." text. "Continue to Next Week" advances.
+
+7. **Demo End Phase:** After the departure screen, a "Thanks for Playing!" screen appears indicating the demo is complete. A "Back to Menu" button returns the player to the main menu. (This is a prototype placeholder until multi-week gameplay is implemented.)
 
 ---
 
 ## 11. Item System
 
-**Inventory: Unlimited bag** (no slot cap). Items are stored in the player store and displayed in a scrollable grid UI.
+**Backpack: Unlimited bag** (no slot cap). The HUD button is labelled "Backpack" (previously "Inventory"). The Backpack popup has two sections: **Vibes** (top — displays all NPC relationship bars with tier labels and numeric values) and **Items** (below — the standard scrollable inventory grid).
 **Pickup: Free** -- walking near a dropped item auto-collects it (proximity radius 1.8 units).
 
 ### All Items
@@ -566,6 +580,8 @@ The deterministic hash (`simpleHash`) ensures consistent behavior per NPC -- the
 
 **Night NPC Talk:** All nighttime conversations cost 0 energy (`TALK_NPC_NIGHT`), making nighttime the ideal time to build relationships without resource pressure. The `NIGHT_CHAT_BONUS` of +3 relationship is available for night chats.
 
+**Player Night Glow:** During `NIGHTTIME_FREE`, the player character emits a warm point light (color `#ffe8a0`, intensity 6, distance 8 units) as a lantern-like effect.
+
 ---
 
 ## 14. Camera System
@@ -605,9 +621,9 @@ The following features are referenced in the design or partially stubbed but not
 
 3. **Player Bio Generation:** The player character has a basic backstory but there is no system for the player to customize their bio, personality, or appearance.
 
-4. **Real Audio:** No sound effects or music are implemented. The game is silent.
+4. **~~Real Audio:~~** *(Implemented)* Day and night music tracks play via Howler.js with crossfading. Synthesized SFX include typewriter ticks (dialogue/producer intro) and button tap sounds. Audio toggle is available on the main menu and in-game HUD.
 
-5. **Full 4-Week Season:** The weekly cycle repeats indefinitely. There is no concept of a season finale, winner declaration, or game-ending condition after a set number of weeks.
+5. **Full 4-Week Season:** The prototype currently ends after Week 1's ceremony with a "Thanks for Playing" demo end screen. There is no concept of a season finale, winner declaration, or multi-week progression yet.
 
 6. **Complete NPC Dialogue Coverage:** Date dialogues only exist for Rosie and Kiki (`DATE_DIALOGUES`). Blaze, Pudge, Sprocket, and Lily need date scripts.
 
