@@ -677,18 +677,24 @@ function ScatteredRocks() {
 
 function WaterPlane({ isNight }: { isNight: boolean }) {
   const meshRef = useRef<THREE.Mesh>(null);
+  const waterTexture = useConfiguredTexture("/textures/Water.png", [20, 20]);
 
   useFrame(({ clock }) => {
+    const t = clock.getElapsedTime();
     if (meshRef.current) {
-      meshRef.current.position.y = -0.15 + Math.sin(clock.getElapsedTime() * 0.5) * 0.05;
+      meshRef.current.position.y = -0.15 + Math.sin(t * 0.5) * 0.05;
     }
+    // Slowly scroll UVs for a moving water effect
+    waterTexture.offset.x = t * 0.01;
+    waterTexture.offset.y = t * 0.008;
   });
 
   return (
     <mesh ref={meshRef} rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.15, 0]}>
       <planeGeometry args={[120, 120, 1, 1]} />
       <meshStandardMaterial
-        color={isNight ? "#0A2A4A" : "#1E90FF"}
+        color={isNight ? "#2A4A6A" : "#ffffff"}
+        map={waterTexture}
         transparent
         opacity={0.75}
         roughness={0.15}
@@ -744,7 +750,9 @@ export default function IslandEnvironment({ isNight }: IslandEnvironmentProps) {
   return (
     <group>
       {/* Water (large plane under everything) */}
-      <WaterPlane isNight={isNight} />
+      <Suspense fallback={null}>
+        <WaterPlane isNight={isNight} />
+      </Suspense>
 
       {/* Textured zones — Suspense handles texture loading; scene appears once all are ready */}
       <Suspense fallback={null}>

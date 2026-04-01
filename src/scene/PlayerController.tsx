@@ -1,8 +1,9 @@
 "use client";
 
-import { useRef, useMemo, useEffect } from "react";
+import { useRef, useMemo, useEffect, Suspense } from "react";
 import * as THREE from "three";
 import { useFrame } from "@react-three/fiber";
+import { useGLTF } from "@react-three/drei";
 import { PLAYER } from "@/game/constants";
 import { ZONE_POSITIONS } from "@/scene/IslandEnvironment";
 import { VILLA_INTERIOR, BED_POSITIONS } from "@/scene/VillaInterior";
@@ -382,78 +383,77 @@ export default function PlayerController({
   // ---- render ------------------------------------------------------------
   return (
     <group ref={groupRef} position={position}>
-      <DogCharacter />
+      <Suspense fallback={null}>
+        <FerretCharacter isMoving={isMoving} />
+      </Suspense>
     </group>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Dog character mesh (capsule body + sphere head + triangle ears)
+// Ferret GLB character (static model with programmatic animation)
 // ---------------------------------------------------------------------------
 
-const BODY_COLOR = "#D4A05A"; // warm tan / golden
-const NOSE_COLOR = "#3A2518";
-const EAR_COLOR = "#B8863A";
-const EYE_COLOR = "#1A1A1A";
+const FERRET_SCALE = 1.2;
 
-function DogCharacter() {
-  // Ear geometry (triangle / cone flattened)
-  const earGeometry = useMemo(() => {
-    const geo = new THREE.ConeGeometry(0.15, 0.3, 4);
-    geo.translate(0, 0.15, 0);
-    return geo;
-  }, []);
+function FerretCharacter({ isMoving }: { isMoving: React.MutableRefObject<boolean> }) {
+  const { scene } = useGLTF("/models/Characters/Ferret.glb");
+  const modelRef = useRef<THREE.Group>(null);
+  const breathPhase = useRef(0);
+
+  // Clone the scene so we can safely transform it
+  const clonedScene = useMemo(() => {
+    const clone = scene.clone(true);
+    clone.traverse((child) => {
+      if ((child as THREE.Mesh).isMesh) {
+        child.castShadow = true;
+        child.receiveShadow = true;
+      }
+    });
+    return clone;
+  }, [scene]);
+
+  // Centre and ground the model based on its bounding box
+  const layout = useMemo(() => {
+    const box = new THREE.Box3().setFromObject(clonedScene);
+    const size = box.getSize(new THREE.Vector3());
+    const center = box.getCenter(new THREE.Vector3());
+    const targetHeight = 1.2; // world units
+    const fitScale = targetHeight / size.y;
+    // Shift pivot forward on Z by 75% of depth (tail is behind, body centre is forward)
+    const pivotZ = box.min.z + size.z * 0.75;
+    return {
+      fitScale,
+      offset: new THREE.Vector3(-center.x, -box.min.y, -pivotZ),
+    };
+  }, [clonedScene]);
+
+  useFrame((_, delta) => {
+    if (!modelRef.current) return;
+
+    breathPhase.current += delta * 2.5;
+    const breathScale = 1 + Math.sin(breathPhase.current) * 0.015;
+    const walkPulse = isMoving.current
+      ? 1 + Math.sin(breathPhase.current * 4) * 0.03
+      : 1;
+
+    const s = layout.fitScale * FERRET_SCALE;
+    modelRef.current.scale.set(s * walkPulse, s * breathScale, s * walkPulse);
+  });
+
+  const s = layout.fitScale * FERRET_SCALE;
 
   return (
-    <group>
-      {/* Body – cylinder */}
-      <mesh castShadow position={[0, 0.45, 0]}>
-        <cylinderGeometry args={[0.25, 0.3, 0.6, 12]} />
-        <meshStandardMaterial color={BODY_COLOR} roughness={0.85} />
-      </mesh>
-
-      {/* Head – sphere */}
-      <mesh castShadow position={[0, 0.95, 0]}>
-        <sphereGeometry args={[0.25, 12, 10]} />
-        <meshStandardMaterial color={BODY_COLOR} roughness={0.85} />
-      </mesh>
-
-      {/* Left ear */}
-      <mesh
-        position={[-0.15, 1.2, 0]}
-        rotation={[0, 0, 0.25]}
-        geometry={earGeometry}
-      >
-        <meshStandardMaterial color={EAR_COLOR} roughness={0.85} />
-      </mesh>
-
-      {/* Right ear */}
-      <mesh
-        position={[0.15, 1.2, 0]}
-        rotation={[0, 0, -0.25]}
-        geometry={earGeometry}
-      >
-        <meshStandardMaterial color={EAR_COLOR} roughness={0.85} />
-      </mesh>
-
-      {/* Eyes */}
-      <mesh position={[-0.08, 0.98, 0.22]}>
-        <sphereGeometry args={[0.04, 8, 8]} />
-        <meshStandardMaterial color={EYE_COLOR} />
-      </mesh>
-      <mesh position={[0.08, 0.98, 0.22]}>
-        <sphereGeometry args={[0.04, 8, 8]} />
-        <meshStandardMaterial color={EYE_COLOR} />
-      </mesh>
-
-      {/* Nose */}
-      <mesh position={[0, 0.9, 0.26]}>
-        <sphereGeometry args={[0.05, 8, 8]} />
-        <meshStandardMaterial color={NOSE_COLOR} />
-      </mesh>
+    <group ref={modelRef} scale={[s, s, s]}>
+      <primitive
+        object={clonedScene}
+        position={[layout.offset.x, layout.offset.y, layout.offset.z]}
+      />
     </group>
   );
 }
+
+useGLTF.preload("/models/Characters/Ferret.glb");
 
 // ---------------------------------------------------------------------------
 // Helpers

@@ -174,7 +174,7 @@ function clampToPlayableArea(x: number, z: number): [number, number] {
  * Returns 2-4 items scattered across the island in open areas.
  */
 export function generateNightlyDrops(zonePositions: Record<string, [number, number, number]>): DroppedItem[] {
-  const count = 2 + Math.floor(Math.random() * 3); // 2-4 items
+  const count = 3 + Math.floor(Math.random() * 2); // guaranteed 3-4 items
   const drops: DroppedItem[] = [];
   const usedIds = new Set<string>();
 
@@ -190,13 +190,10 @@ export function generateNightlyDrops(zonePositions: Record<string, [number, numb
     }
 
     if (!item) {
-      const candidates = ITEM_DEFS.filter(it => !usedIds.has(it.id) || it.rarity === 'common');
-      if (candidates.length > 0) {
-        item = candidates[Math.floor(Math.random() * candidates.length)];
-      }
+      // Common items are always eligible; non-common only if not already used
+      const candidates = ITEM_DEFS.filter(it => it.rarity === 'common' || !usedIds.has(it.id));
+      item = candidates[Math.floor(Math.random() * candidates.length)] ?? ITEM_DEFS[0];
     }
-
-    if (!item) continue;
     usedIds.add(item.id);
 
     // Journals have a 50% chance of spawning near their NPC's bed inside the villa

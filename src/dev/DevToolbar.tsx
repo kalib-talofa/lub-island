@@ -8,7 +8,7 @@ import { useRelationshipStore } from '@/store/relationshipStore';
 import { usePlayerStore } from '@/store/playerStore';
 import { cameraAngleRef } from '@/scene/IsometricCamera';
 import { ITEM_DEFS, JOURNAL_DEFS } from '@/systems/items';
-import { droppedItemsRef } from '@/game/GameLoop';
+import { droppedItemsRef, triggerNightSpawnRef } from '@/game/GameLoop';
 import { playerPositionRef } from '@/scene/PlayerController';
 
 export default function DevToolbar() {
@@ -72,7 +72,7 @@ export default function DevToolbar() {
     const eventsCtrl = gameFolder.add(gameProxy, 'eventsRemaining').name('Events Left').disable();
     const phaseCtrl = gameFolder.add(gameProxy, 'phase').name('Phase').disable();
 
-    gameFolder.add({ advanceToNight: () => useGameStore.getState().advanceToNight() }, 'advanceToNight').name('🌙 Advance to Night');
+    gameFolder.add({ advanceToNight: () => { useGameStore.getState().advanceToNight(); triggerNightSpawnRef.current?.(); } }, 'advanceToNight').name('🌙 Advance to Night');
     gameFolder.add({ advanceDay: () => useGameStore.getState().advanceDay() }, 'advanceDay').name('☀️ Advance to Next Day');
     gameFolder.add({ advanceToCeremony: () => useGameStore.getState().advanceToCeremony() }, 'advanceToCeremony').name('🏛️ Advance to Ceremony');
     gameFolder.add({ resetWeek: () => useGameStore.getState().resetWeek() }, 'resetWeek').name('🔄 Reset Week');

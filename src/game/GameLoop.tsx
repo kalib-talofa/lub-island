@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useGameStore } from '@/store/gameStore';
 import { usePlayerStore } from '@/store/playerStore';
 import { useBiometricStore } from '@/store/biometricStore';
@@ -67,6 +67,9 @@ export interface GameLoopState {
 /** Module-level ref so DevToolbar can read active drops without prop drilling */
 export const droppedItemsRef: { current: DroppedItem[] } = { current: [] };
 
+/** Called by DevToolbar's Advance to Night button to also spawn drops */
+export const triggerNightSpawnRef: { current: (() => void) | null } = { current: null };
+
 export function useGameLoop() {
   const gameStore = useGameStore();
   const playerStore = usePlayerStore();
@@ -102,8 +105,6 @@ export function useGameLoop() {
     briefingEvents: [],
   });
 
-  // Keep droppedItemsRef in sync for DevToolbar access
-  useEffect(() => { droppedItemsRef.current = state.droppedItems; }, [state.droppedItems]);
 
   // Get active (non-eliminated) cast
   const activeCast = useMemo(() =>
@@ -230,6 +231,7 @@ export function useGameLoop() {
     playerStore.addItem(drop.item);
 
     // Remove from drops
+    droppedItemsRef.current = droppedItemsRef.current.filter((_, i) => i !== index);
     setState(s => ({
       ...s,
       droppedItems: s.droppedItems.filter((_, i) => i !== index),
@@ -475,13 +477,20 @@ export function useGameLoop() {
     setState(s => ({ ...s, showDateUI: false, currentEvent: null, dateNPCId: '', dateNPCName: '' }));
   }, [state.dateNPCId, relStore, playerStore, gameStore]);
 
+  // Spawn nightly drops — also assigned to triggerNightSpawnRef for dev toolbar
+  const spawnNightlyDrops = useCallback(() => {
+    const drops = generateNightlyDrops(ZONE_POSITIONS);
+    droppedItemsRef.current = drops;
+    setState(s => ({ ...s, droppedItems: drops }));
+  }, []);
+  triggerNightSpawnRef.current = spawnNightlyDrops;
+
   // Go to sleep
   const goToSleep = useCallback(() => {
     // If transitioning to night (from daytime), spawn nightly item drops
     if (gameStore.phase === 'DAYTIME_FREE') {
       gameStore.advanceToNight();
-      const drops = generateNightlyDrops(ZONE_POSITIONS);
-      setState(s => ({ ...s, droppedItems: drops }));
+      spawnNightlyDrops();
       return;
     }
 
@@ -506,6 +515,7 @@ export function useGameLoop() {
     }
 
     gameStore.advanceDay();
+    droppedItemsRef.current = [];
     const events = generateDailyEvents(gameStore.day + 1, gameStore.week, activeCast);
     const briefingEvents = events.map(e => e.title);
     setState(s => ({
