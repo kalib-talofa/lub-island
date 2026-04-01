@@ -509,9 +509,11 @@ export function useGameLoop() {
   // Challenge complete
   const handleChallengeComplete = useCallback((score: number, tier: string) => {
     const delta = getRelationshipReward(tier as 'bronze' | 'silver' | 'gold');
+    // Read challengeNPCId from current state before updating
     setState(s => {
+      // Schedule relationship update outside the setState updater
       if (s.challengeNPCId) {
-        relStore.changeRelationship(s.challengeNPCId, delta);
+        queueMicrotask(() => relStore.changeRelationship(s.challengeNPCId, delta));
       }
       return { ...s, showChallengeUI: false, currentEvent: null };
     });
