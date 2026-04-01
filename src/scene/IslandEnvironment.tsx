@@ -38,7 +38,7 @@ export const ZONE_POSITIONS: Record<string, [number, number, number]> = {
 // Reusable sub-components
 // ---------------------------------------------------------------------------
 
-function PalmTree({ position, scale = 1 }: { position: [number, number, number]; scale?: number }) {
+function PalmTree({ position, scale = 5 }: { position: [number, number, number]; scale?: number }) {
   const { scene } = useGLTF("/models/Environment/TropicalTree.glb");
   const clone = useMemo(() => {
     const c = scene.clone();
@@ -48,10 +48,10 @@ function PalmTree({ position, scale = 1 }: { position: [number, number, number];
     });
     return c;
   }, [scene]);
-  return <primitive object={clone} position={position} scale={scale} />;
+  return <primitive object={clone} position={[position[0], position[1] + scale * 0.52, position[2]]} scale={scale} />;
 }
 
-function SimpleTree({ position, scale = 1 }: { position: [number, number, number]; scale?: number }) {
+function SimpleTree({ position, scale = 5 }: { position: [number, number, number]; scale?: number }) {
   const { scene } = useGLTF("/models/Environment/EvergreenTree.glb");
   const clone = useMemo(() => {
     const c = scene.clone();
@@ -61,7 +61,7 @@ function SimpleTree({ position, scale = 1 }: { position: [number, number, number
     });
     return c;
   }, [scene]);
-  return <primitive object={clone} position={position} scale={scale} />;
+  return <primitive object={clone} position={[position[0], position[1] + scale * 0.5, position[2]]} scale={scale} />;
 }
 
 function Rock({ position, scale = 1 }: { position: [number, number, number]; scale?: number }) {
@@ -152,9 +152,9 @@ function Beach({ isNight }: { isNight: boolean }) {
       )}
 
       {/* A few palm trees along the beach */}
-      <PalmTree position={[-8, 0, -2]} scale={1.1} />
-      <PalmTree position={[10, 0, -1.5]} scale={0.9} />
-      <PalmTree position={[-1, 0, -3]} scale={1.0} />
+      <PalmTree position={[-8, 0, -2]} scale={5.5} />
+      <PalmTree position={[10, 0, -1.5]} scale={4.5} />
+      <PalmTree position={[-1, 0, -3]} scale={5.0} />
     </group>
   );
 }
@@ -409,8 +409,8 @@ function JungleTrail({ isNight }: { isNight: boolean }) {
       ))}
 
       {/* A couple palm trees in the jungle */}
-      <PalmTree position={[-4, 0, -5.5]} scale={1.2} />
-      <PalmTree position={[5, 0, -4.5]} scale={1.0} />
+      <PalmTree position={[-4, 0, -5.5]} scale={6.0} />
+      <PalmTree position={[5, 0, -4.5]} scale={5.0} />
     </group>
   );
 }
@@ -758,10 +758,10 @@ export default function IslandEnvironment({ isNight }: IslandEnvironmentProps) {
         <JungleTrail isNight={isNight} />
 
         {/* Extra palm trees scattered around the island */}
-        <PalmTree position={[-10, 0, 12]} scale={1.0} />
-        <PalmTree position={[6, 0, -6]} scale={0.85} />
-        <PalmTree position={[-14, 0, -4]} scale={1.1} />
-        <PalmTree position={[10, 0, -10]} scale={0.95} />
+        <PalmTree position={[-10, 0, 12]} scale={5.0} />
+        <PalmTree position={[6, 0, -6]} scale={4.0} />
+        <PalmTree position={[-14, 0, -4]} scale={5.5} />
+        <PalmTree position={[10, 0, -10]} scale={4.5} />
 
         {/* Extra evergreen trees */}
         <SimpleTree position={[-8, 0, 4]} />

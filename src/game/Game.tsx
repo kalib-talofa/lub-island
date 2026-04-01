@@ -54,6 +54,7 @@ export default function Game() {
     continueCeremony,
     handleProducerPhone,
     dismissItemPopup,
+    handleBedInteract,
     openInventory,
     closeInventory,
     handleUseItem,
@@ -170,6 +171,7 @@ export default function Game() {
         <Suspense fallback={null}>
           <Island
             onNPCInteract={handleNPCInteract}
+            onBedInteract={handleBedInteract}
             droppedItems={state.droppedItems}
             onItemPickup={handleItemPickup}
           />

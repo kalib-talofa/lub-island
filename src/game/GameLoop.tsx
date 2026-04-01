@@ -592,6 +592,28 @@ export function useGameLoop() {
     }));
   }, []);
 
+  // Bed interaction inside the villa
+  const handleBedInteract = useCallback((npcId: string, isSleeping: boolean) => {
+    const npc = STARTING_CAST.find(c => c.id === npcId);
+    const name = npc?.name ?? npcId;
+
+    if (isSleeping) {
+      setState(s => ({
+        ...s,
+        showItemPopup: true,
+        itemPopupName: `${name}'s Bed`,
+        itemPopupDesc: `${name} is fast asleep. Zzz...`,
+      }));
+    } else {
+      setState(s => ({
+        ...s,
+        showItemPopup: true,
+        itemPopupName: `${name}'s Bed`,
+        itemPopupDesc: `This is where ${name} sleeps. The bed is currently empty.`,
+      }));
+    }
+  }, []);
+
   // Dismiss item popup
   const dismissItemPopup = useCallback(() => {
     setState(s => ({ ...s, showItemPopup: false }));
@@ -617,6 +639,7 @@ export function useGameLoop() {
     continueCeremony,
     handleProducerPhone,
     dismissItemPopup,
+    handleBedInteract,
     // Item system
     openInventory,
     closeInventory,

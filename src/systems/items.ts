@@ -2,6 +2,7 @@
 
 import type { ItemDef } from '@/characters/CharacterData';
 import { STARTING_CAST } from '@/characters/roster';
+import { BED_POSITIONS } from '@/scene/VillaInterior';
 
 // ---------------------------------------------------------------------------
 // Core item definitions
@@ -75,7 +76,7 @@ export const JOURNAL_DEFS: ItemDef[] = STARTING_CAST.map((npc) => ({
   description: `A worn leather journal with ${npc.name}'s private thoughts. Read it to unlock a special dialogue option.`,
   effect: 'reveal_info' as const,
   effectValue: 0,
-  spawnZones: [npc.preferredZone],
+  spawnZones: [npc.preferredZone, 'Villa'],
   rarity: 'uncommon' as const,
   ownerNpcId: npc.id,
   giftValue: 0,
@@ -153,6 +154,8 @@ const ISLAND_RADIUS = 19;
 export interface DroppedItem {
   item: ItemDef;
   position: [number, number, number];
+  /** If true, this item is inside the villa */
+  isIndoors?: boolean;
 }
 
 /** Ensure a position is within the island circle and not too close to origin (villa). */
@@ -195,6 +198,22 @@ export function generateNightlyDrops(zonePositions: Record<string, [number, numb
 
     if (!item) continue;
     usedIds.add(item.id);
+
+    // Journals have a 50% chance of spawning near their NPC's bed inside the villa
+    if (item.ownerNpcId && Math.random() < 0.5) {
+      const bed = BED_POSITIONS.find(b => b.npcId === item.ownerNpcId);
+      if (bed) {
+        // Place near the bed with a small offset
+        const bx = bed.position[0] + (Math.random() - 0.5) * 1.5;
+        const bz = bed.position[2] + (Math.random() - 0.5) * 1.5;
+        drops.push({
+          item,
+          position: [bx, 0.3, bz],
+          isIndoors: true,
+        });
+        continue;
+      }
+    }
 
     // Pick a drop zone — prefer the item's spawn zone if it maps to a known key
     const preferredZone = item.spawnZones[0];

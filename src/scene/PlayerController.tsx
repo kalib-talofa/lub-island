@@ -5,7 +5,7 @@ import * as THREE from "three";
 import { useFrame } from "@react-three/fiber";
 import { PLAYER } from "@/game/constants";
 import { ZONE_POSITIONS } from "@/scene/IslandEnvironment";
-import { VILLA_INTERIOR } from "@/scene/VillaInterior";
+import { VILLA_INTERIOR, BED_POSITIONS } from "@/scene/VillaInterior";
 import { useGameStore } from "@/store/gameStore";
 
 // ---------------------------------------------------------------------------
@@ -215,22 +215,29 @@ const ISO_ANGLE = Math.PI / 4;
 // PlayerController
 // ---------------------------------------------------------------------------
 
+const BED_INTERACT_RADIUS = 2.0;
+
 interface PlayerControllerProps {
   position?: [number, number, number];
   isMovementLocked: boolean;
   isIndoors?: boolean;
+  sleepingNPCs?: string[];
+  onBedInteract?: (npcId: string, isSleeping: boolean) => void;
 }
 
 export default function PlayerController({
   position = [0, 0, 0],
   isMovementLocked,
   isIndoors = false,
+  sleepingNPCs = [],
+  onBedInteract,
 }: PlayerControllerProps) {
   const groupRef = useRef<THREE.Group>(null);
   const bobPhase = useRef(0);
   const currentRotation = useRef(0);
   const isMoving = useRef(false);
   const doorCooldown = useRef(0); // prevent rapid enter/exit
+  const bedCooldown = useRef(0); // prevent rapid bed interactions
 
   const enterVilla = useGameStore((s) => s.enterVilla);
   const exitVilla = useGameStore((s) => s.exitVilla);
@@ -247,6 +254,7 @@ export default function PlayerController({
 
     // Door cooldown timer
     if (doorCooldown.current > 0) doorCooldown.current -= delta;
+    if (bedCooldown.current > 0) bedCooldown.current -= delta;
 
     // Merge joystick + WASD input
     const joy = joystickInputRef.current;
@@ -290,13 +298,25 @@ export default function PlayerController({
         // Check for door exit
         if (doorCooldown.current <= 0 && isAtDoorExit(playerPositionRef.current.x, playerPositionRef.current.z)) {
           doorCooldown.current = 1.0;
-          // Teleport outside and exit
           playerPositionRef.current.set(
             VILLA_INTERIOR.EXIT_POSITION[0],
             VILLA_INTERIOR.EXIT_POSITION[1],
             VILLA_INTERIOR.EXIT_POSITION[2],
           );
           exitVilla();
+        }
+
+        // Check for bed proximity interaction
+        if (bedCooldown.current <= 0 && onBedInteract) {
+          for (const bed of BED_POSITIONS) {
+            const dx = playerPositionRef.current.x - bed.position[0];
+            const dz = playerPositionRef.current.z - bed.position[2];
+            if (dx * dx + dz * dz < BED_INTERACT_RADIUS * BED_INTERACT_RADIUS) {
+              bedCooldown.current = 2.0;
+              onBedInteract(bed.npcId, sleepingNPCs.includes(bed.npcId));
+              break;
+            }
+          }
         }
       } else {
         // ---- OUTDOOR movement (island) ----

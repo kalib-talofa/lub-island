@@ -9,7 +9,7 @@ import { STARTING_CAST } from "@/characters/roster";
 // ---------------------------------------------------------------------------
 
 // Bed assignments: each NPC gets a bed spot along the walls
-const BED_POSITIONS: { npcId: string; position: [number, number, number]; rotation: number }[] = [
+export const BED_POSITIONS: { npcId: string; position: [number, number, number]; rotation: number }[] = [
   // Left wall beds (facing right)
   { npcId: 'rosie',    position: [-7, 0, -3],  rotation: Math.PI / 2 },
   { npcId: 'blaze',    position: [-7, 0, 0],   rotation: Math.PI / 2 },
@@ -30,20 +30,34 @@ const NPC_COLORS: Record<string, string> = {
   lily:     '#7ED67E',
 };
 
+// NPC body colours (matches NPCController)
+const NPC_BODY_COLORS: Record<string, string> = {
+  rosie:    '#FFB6C1',
+  blaze:    '#FF6B35',
+  pudge:    '#D4A574',
+  kiki:     '#2A2A2A',
+  sprocket: '#C0C0C0',
+  lily:     '#228B22',
+};
+
 interface VillaInteriorProps {
   isNight: boolean;
+  /** NPC IDs that are currently sleeping (hidden outdoors, visible on beds) */
+  sleepingNPCs?: string[];
+  /** Called when player interacts with a bed */
+  onBedInteract?: (npcId: string, isSleeping: boolean) => void;
 }
 
 // Individual bed with frame, mattress, pillow, and name tag
-function Bed({ npcId, position, rotation, isNight }: {
+function Bed({ npcId, position, rotation, isNight, isSleeping }: {
   npcId: string;
   position: [number, number, number];
   rotation: number;
   isNight: boolean;
+  isSleeping: boolean;
 }) {
-  const npc = STARTING_CAST.find(c => c.id === npcId);
   const color = NPC_COLORS[npcId] ?? '#888888';
-  const name = npc?.name ?? npcId;
+  const bodyColor = NPC_BODY_COLORS[npcId] ?? '#888888';
 
   return (
     <group position={position} rotation={[0, rotation, 0]}>
@@ -65,6 +79,27 @@ function Bed({ npcId, position, rotation, isNight }: {
         <meshStandardMaterial color={color} roughness={0.7} />
       </mesh>
 
+      {/* Sleeping NPC on the bed — lying along local Z axis (head at -Z / pillow) */}
+      {isSleeping && (
+        <group position={[0, 0.5, 0]}>
+          {/* Body — cylinder lying flat along the bed length (local Z) */}
+          <mesh position={[0, 0.06, 0.15]} rotation={[Math.PI / 2, 0, 0]}>
+            <cylinderGeometry args={[0.2, 0.22, 0.7, 10]} />
+            <meshStandardMaterial color={bodyColor} roughness={0.85} />
+          </mesh>
+          {/* Head — sphere near the pillow */}
+          <mesh position={[0, 0.1, -0.5]}>
+            <sphereGeometry args={[0.2, 10, 8]} />
+            <meshStandardMaterial color={bodyColor} roughness={0.85} />
+          </mesh>
+          {/* Blanket over body */}
+          <mesh position={[0, 0.02, 0.2]}>
+            <boxGeometry args={[0.85, 0.04, 1.0]} />
+            <meshStandardMaterial color={color} roughness={0.7} transparent opacity={0.8} />
+          </mesh>
+        </group>
+      )}
+
       {/* Pillow */}
       <mesh position={[0, 0.46, -0.7]}>
         <boxGeometry args={[0.6, 0.1, 0.35]} />
@@ -83,25 +118,61 @@ function Bed({ npcId, position, rotation, isNight }: {
         <meshStandardMaterial color={isNight ? '#4a3728' : '#6B4423'} roughness={0.85} />
       </mesh>
 
+      {/* Bedside lamp (glowing) */}
+      <mesh position={[0.8, 0.55, -0.6]}>
+        <cylinderGeometry args={[0.06, 0.08, 0.1, 8]} />
+        <meshStandardMaterial
+          color="#FFF8E0"
+          emissive="#FFD060"
+          emissiveIntensity={isNight ? 1.0 : 0.4}
+          roughness={0.4}
+        />
+      </mesh>
+      <mesh position={[0.8, 0.65, -0.6]}>
+        <cylinderGeometry args={[0.12, 0.08, 0.12, 8]} />
+        <meshStandardMaterial
+          color="#FFF0D0"
+          emissive="#FFD060"
+          emissiveIntensity={isNight ? 0.8 : 0.3}
+          roughness={0.5}
+          transparent
+          opacity={0.9}
+        />
+      </mesh>
+      {/* Lamp point light */}
+      <pointLight
+        position={[0.8, 1.0, -0.6]}
+        intensity={isNight ? 1.5 : 0.6}
+        color="#FFE0A0"
+        distance={5}
+        decay={1.8}
+      />
+
       {/* Name tag on wall behind bed */}
       <mesh position={[0, 1.1, -1.12]}>
         <boxGeometry args={[0.8, 0.25, 0.02]} />
-        <meshStandardMaterial color={color} roughness={0.5} />
+        <meshStandardMaterial
+          color={color}
+          emissive={color}
+          emissiveIntensity={0.15}
+          roughness={0.5}
+        />
       </mesh>
     </group>
   );
 }
 
-export default function VillaInterior({ isNight }: VillaInteriorProps) {
-  const wallColor = isNight ? '#2a2520' : '#E8DCC8';
-  const floorColor = isNight ? '#3d3530' : '#C4A66A';
-  const ceilingColor = isNight ? '#2a2520' : '#DDD5C0';
-  const trimColor = isNight ? '#4a3728' : '#6B4423';
+export default function VillaInterior({ isNight, sleepingNPCs = [] }: VillaInteriorProps) {
+  const wallColor = isNight ? '#4a4540' : '#E8DCC8';
+  const floorColor = isNight ? '#554a40' : '#C4A66A';
+  const trimColor = isNight ? '#5a4838' : '#6B4423';
 
   // Room dimensions — bigger on the inside!
   const roomW = 18;
   const roomD = 14;
   const roomH = 4;
+
+  const sleepingSet = useMemo(() => new Set(sleepingNPCs), [sleepingNPCs]);
 
   return (
     <group>
@@ -114,11 +185,11 @@ export default function VillaInterior({ isNight }: VillaInteriorProps) {
       {/* Floor rug — central decorative rug */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]}>
         <planeGeometry args={[6, 4]} />
-        <meshStandardMaterial color={isNight ? '#4a2030' : '#9B4D6E'} roughness={0.9} />
+        <meshStandardMaterial color={isNight ? '#5a3040' : '#9B4D6E'} roughness={0.9} />
       </mesh>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.025, 0]}>
         <planeGeometry args={[5.2, 3.2]} />
-        <meshStandardMaterial color={isNight ? '#5a2a3a' : '#B8607A'} roughness={0.9} />
+        <meshStandardMaterial color={isNight ? '#6a3a4a' : '#B8607A'} roughness={0.9} />
       </mesh>
 
       {/* No ceiling rendered — isometric camera looks down from above */}
@@ -142,17 +213,14 @@ export default function VillaInterior({ isNight }: VillaInteriorProps) {
       </mesh>
 
       {/* Front wall (+Z) — with door opening */}
-      {/* Left section of front wall */}
       <mesh position={[-roomW / 4 - 0.5, roomH / 2, roomD / 2]} rotation={[0, Math.PI, 0]}>
         <planeGeometry args={[roomW / 2 - 1, roomH]} />
         <meshStandardMaterial color={wallColor} roughness={0.9} side={THREE.DoubleSide} />
       </mesh>
-      {/* Right section of front wall */}
       <mesh position={[roomW / 4 + 0.5, roomH / 2, roomD / 2]} rotation={[0, Math.PI, 0]}>
         <planeGeometry args={[roomW / 2 - 1, roomH]} />
         <meshStandardMaterial color={wallColor} roughness={0.9} side={THREE.DoubleSide} />
       </mesh>
-      {/* Top of door frame */}
       <mesh position={[0, roomH - 0.5, roomD / 2]} rotation={[0, Math.PI, 0]}>
         <planeGeometry args={[2, 1]} />
         <meshStandardMaterial color={wallColor} roughness={0.9} side={THREE.DoubleSide} />
@@ -171,16 +239,16 @@ export default function VillaInterior({ isNight }: VillaInteriorProps) {
       {/* Door mat */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, roomD / 2 - 0.8]}>
         <planeGeometry args={[1.6, 0.8]} />
-        <meshStandardMaterial color={isNight ? '#3a3020' : '#8B7355'} roughness={0.95} />
+        <meshStandardMaterial color={isNight ? '#4a4030' : '#8B7355'} roughness={0.95} />
       </mesh>
 
       {/* EXIT sign above door */}
       <mesh position={[0, 3.2, roomD / 2 - 0.06]}>
         <boxGeometry args={[1.2, 0.3, 0.04]} />
-        <meshStandardMaterial color="#22c55e" emissive="#22c55e" emissiveIntensity={0.3} roughness={0.5} />
+        <meshStandardMaterial color="#22c55e" emissive="#22c55e" emissiveIntensity={0.6} roughness={0.5} />
       </mesh>
 
-      {/* Wall trim / baseboard along all walls */}
+      {/* Wall trim / baseboard */}
       <mesh position={[0, 0.08, -roomD / 2 + 0.04]}>
         <boxGeometry args={[roomW, 0.16, 0.08]} />
         <meshStandardMaterial color={trimColor} roughness={0.85} />
@@ -202,68 +270,98 @@ export default function VillaInterior({ isNight }: VillaInteriorProps) {
           position={bed.position}
           rotation={bed.rotation}
           isNight={isNight}
+          isSleeping={sleepingSet.has(bed.npcId)}
         />
       ))}
 
       {/* Central lounge area — couch */}
       <mesh position={[0, 0.35, -1]} castShadow>
         <boxGeometry args={[3, 0.4, 1.0]} />
-        <meshStandardMaterial color={isNight ? '#3a2830' : '#7B4D6E'} roughness={0.8} />
+        <meshStandardMaterial color={isNight ? '#5a4850' : '#7B4D6E'} roughness={0.8} />
       </mesh>
-      {/* Couch back */}
       <mesh position={[0, 0.7, -1.4]} castShadow>
         <boxGeometry args={[3, 0.5, 0.2]} />
-        <meshStandardMaterial color={isNight ? '#3a2830' : '#7B4D6E'} roughness={0.8} />
+        <meshStandardMaterial color={isNight ? '#5a4850' : '#7B4D6E'} roughness={0.8} />
       </mesh>
-      {/* Couch arm rests */}
       <mesh position={[-1.4, 0.55, -1]} castShadow>
         <boxGeometry args={[0.2, 0.5, 1.0]} />
-        <meshStandardMaterial color={isNight ? '#3a2830' : '#7B4D6E'} roughness={0.8} />
+        <meshStandardMaterial color={isNight ? '#5a4850' : '#7B4D6E'} roughness={0.8} />
       </mesh>
       <mesh position={[1.4, 0.55, -1]} castShadow>
         <boxGeometry args={[0.2, 0.5, 1.0]} />
-        <meshStandardMaterial color={isNight ? '#3a2830' : '#7B4D6E'} roughness={0.8} />
+        <meshStandardMaterial color={isNight ? '#5a4850' : '#7B4D6E'} roughness={0.8} />
       </mesh>
 
-      {/* Coffee table */}
-      <mesh position={[0, 0.25, 0.8]} castShadow>
+      {/* Coffee table — tabletop */}
+      <mesh position={[0, 0.35, 1.5]} castShadow>
         <boxGeometry args={[1.6, 0.08, 0.8]} />
-        <meshStandardMaterial color={isNight ? '#4a3728' : '#6B4423'} roughness={0.85} />
+        <meshStandardMaterial color={isNight ? '#5a4838' : '#6B4423'} roughness={0.85} />
       </mesh>
-      {/* Table legs */}
-      {[[-0.65, 0.12, 0.25], [0.65, 0.12, 0.25], [-0.65, 0.12, -0.25], [0.65, 0.12, -0.25]].map((p, i) => (
-        <mesh key={`tl-${i}`} position={[p[0], p[1] + 0.8 - 0.12, p[2] + 0.8]}>
-          <cylinderGeometry args={[0.04, 0.04, 0.24, 6]} />
-          <meshStandardMaterial color={isNight ? '#4a3728' : '#6B4423'} roughness={0.85} />
+      {/* Coffee table legs — 4 legs positioned under the tabletop */}
+      {[[-0.65, -0.25], [0.65, -0.25], [-0.65, 0.25], [0.65, 0.25]].map(([lx, lz], i) => (
+        <mesh key={`tl-${i}`} position={[lx, 0.16, 1.5 + lz]}>
+          <cylinderGeometry args={[0.04, 0.04, 0.3, 6]} />
+          <meshStandardMaterial color={isNight ? '#5a4838' : '#6B4423'} roughness={0.85} />
         </mesh>
       ))}
 
-      {/* Interior lighting */}
+      {/* ================================================================= */}
+      {/* Interior lighting — very bright to ensure visibility              */}
+      {/* ================================================================= */}
+
+      {/* Strong ambient — base illumination for the entire room */}
+      <ambientLight intensity={isNight ? 1.0 : 1.4} color={isNight ? '#D0C8E8' : '#FFF8F0'} />
+
+      {/* Main overhead light */}
       <pointLight
         position={[0, 3.5, 0]}
-        intensity={isNight ? 0.6 : 1.2}
+        intensity={isNight ? 3.0 : 4.0}
         color={isNight ? '#FFD080' : '#FFF8F0'}
-        distance={20}
-        decay={1.5}
-      />
-      {/* Secondary fill lights */}
-      <pointLight
-        position={[-6, 2.5, 0]}
-        intensity={isNight ? 0.3 : 0.5}
-        color={isNight ? '#FFD080' : '#FFF8F0'}
-        distance={12}
-        decay={2}
-      />
-      <pointLight
-        position={[6, 2.5, 0]}
-        intensity={isNight ? 0.3 : 0.5}
-        color={isNight ? '#FFD080' : '#FFF8F0'}
-        distance={12}
-        decay={2}
+        distance={25}
+        decay={1.0}
       />
 
-      {/* Ambient boost for interior */}
-      <ambientLight intensity={isNight ? 0.3 : 0.5} color={isNight ? '#8090C0' : '#FFF8F0'} />
+      {/* Left side overhead */}
+      <pointLight
+        position={[-6, 3.0, 0]}
+        intensity={isNight ? 2.0 : 2.5}
+        color={isNight ? '#FFD080' : '#FFF8F0'}
+        distance={16}
+        decay={1.2}
+      />
+      {/* Right side overhead */}
+      <pointLight
+        position={[6, 3.0, 0]}
+        intensity={isNight ? 2.0 : 2.5}
+        color={isNight ? '#FFD080' : '#FFF8F0'}
+        distance={16}
+        decay={1.2}
+      />
+
+      {/* Back wall light */}
+      <pointLight
+        position={[0, 2.5, -5]}
+        intensity={isNight ? 1.5 : 2.0}
+        color={isNight ? '#FFD080' : '#FFF8F0'}
+        distance={12}
+        decay={1.5}
+      />
+
+      {/* Door area light */}
+      <pointLight
+        position={[0, 2.5, 6]}
+        intensity={isNight ? 1.2 : 1.5}
+        color={isNight ? '#80C0FF' : '#FFF8F0'}
+        distance={10}
+        decay={1.5}
+      />
+
+      {/* Hemisphere light for even fill */}
+      <hemisphereLight
+        color={isNight ? '#8090C0' : '#FFF8F0'}
+        groundColor={isNight ? '#504840' : '#C4A66A'}
+        intensity={isNight ? 0.8 : 1.0}
+      />
     </group>
   );
 }
