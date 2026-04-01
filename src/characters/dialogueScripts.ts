@@ -2263,9 +2263,20 @@ export function resetNPCDialogueProgress(): void {
  *   mid  = 20 <= relationship < 60
  *   high = relationship >= 60
  */
-export function getDialogueForNPC(npcId: string, relationship: number): DialogueScript {
+export function getDialogueForNPC(npcId: string, relationship: number, gameDay = 7): DialogueScript {
   const tierIndex = relationship >= 60 ? 2 : relationship >= 20 ? 1 : 0;
-  const dayIndex = getNPCDialogueDay(npcId);
+  const progress = getNPCDialogueDay(npcId);
+
+  // Cap dialogue group to the current game day (day 1 = max group 0, day 5 = max group 4)
+  // If the NPC's progress has reached or passed the current day, return fallback
+  if (progress >= gameDay) {
+    const dailyScripts = DAILY_DIALOGUES[npcId]?.[gameDay - 1];
+    const firstNode = dailyScripts?.[tierIndex]?.nodes?.['start'];
+    const name = firstNode?.speaker ?? npcId;
+    return makeFallbackScript(npcId, name);
+  }
+
+  const dayIndex = progress;
 
   // Try daily dialogue system first
   const dailyScripts = DAILY_DIALOGUES[npcId]?.[dayIndex];
@@ -2300,13 +2311,13 @@ export function getDialogueForNPC(npcId: string, relationship: number): Dialogue
  * Pick the drama dialogue script for an NPC.
  * Falls back to regular chat dialogue if no drama script exists.
  */
-export function getDramaDialogueForNPC(npcId: string, relationship: number): DialogueScript {
+export function getDramaDialogueForNPC(npcId: string, relationship: number, gameDay = 7): DialogueScript {
   const script = DRAMA_DIALOGUES[npcId];
-  if (!script) return getDialogueForNPC(npcId, relationship);
+  if (!script) return getDialogueForNPC(npcId, relationship, gameDay);
 
   // If already seen today, fall back to regular chat
   if (hasSeenDialogue(script.id)) {
-    return getDialogueForNPC(npcId, relationship);
+    return getDialogueForNPC(npcId, relationship, gameDay);
   }
 
   return script;

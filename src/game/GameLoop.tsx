@@ -308,7 +308,7 @@ export function useGameLoop() {
     }
 
     const relationship = relStore.getRelationship(npcId);
-    const script = getDialogueForNPC(npcId, relationship);
+    const script = getDialogueForNPC(npcId, relationship, gameStore.day);
 
     const runner = new DialogueRunner(script, {
       charm: bio.charm,
@@ -462,7 +462,7 @@ export function useGameLoop() {
         if (event.type === 'drama') {
           // Drama events use drama-specific dialogue scripts
           const relationship = relStore.getRelationship(npc.id);
-          const script = getDramaDialogueForNPC(npc.id, relationship);
+          const script = getDramaDialogueForNPC(npc.id, relationship, gameStore.day);
           const runner = new DialogueRunner(script, {
             charm: bio.charm,
             energy: bio.energy,
