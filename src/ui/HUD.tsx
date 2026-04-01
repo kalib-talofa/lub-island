@@ -1,9 +1,11 @@
 "use client";
 
+import { useState } from "react";
 import { useGameStore } from "@/store/gameStore";
 import { useBiometricStore } from "@/store/biometricStore";
 import { usePlayerStore } from "@/store/playerStore";
 import { EVENTS_PER_DAY, DAYS_PER_WEEK } from "@/game/constants";
+import { audioManager } from "@/utils/audio";
 
 interface HUDProps {
   onOpenInventory?: () => void;
@@ -13,6 +15,8 @@ export default function HUD({ onOpenInventory }: HUDProps) {
   const { day, isNight, eventsCompleted, phase } = useGameStore();
   const { energy, charm, performance } = useBiometricStore();
   const { inventory, performanceBoostToday } = usePlayerStore();
+
+  const [muted, setMuted] = useState(audioManager.isMuted());
 
   const visible = phase === "DAYTIME_FREE" || phase === "NIGHTTIME_FREE";
   if (!visible) return null;
@@ -73,6 +77,17 @@ export default function HUD({ onOpenInventory }: HUDProps) {
             )}
           </span>
         </div>
+
+        <div className="mx-1 h-5 w-px bg-white/30" />
+
+        {/* Audio toggle */}
+        <button
+          onClick={() => setMuted(audioManager.toggleMute())}
+          className="flex h-7 w-7 items-center justify-center rounded-full text-base transition hover:bg-white/20 active:scale-90"
+          title={muted ? "Unmute" : "Mute"}
+        >
+          {muted ? "\u{1F507}" : "\u{1F50A}"}
+        </button>
       </div>
 
       {/* Row 2: Event dots + Bag button */}

@@ -24,6 +24,7 @@ import ItemPopup from '@/ui/ItemPopup';
 import ProducerPhone from '@/ui/ProducerPhone';
 import InventoryUI from '@/ui/InventoryUI';
 import { canAfford } from '@/systems/energy';
+import { audioManager } from '@/utils/audio';
 import { cameraAngleRef } from '@/scene/IsometricCamera';
 import { playerPositionRef } from '@/scene/PlayerController';
 import { npcPositionsRef } from '@/scene/NPCController';
@@ -64,6 +65,19 @@ export default function Game() {
   } = useGameLoop();
 
   const showFreeRoamUI = gameStore.phase === 'DAYTIME_FREE' || gameStore.phase === 'NIGHTTIME_FREE';
+
+  // ---------------------------------------------------------------------------
+  // Music — switch between day and night tracks based on game phase
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    const phase = gameStore.phase;
+
+    if (phase === 'NIGHTTIME_FREE' || phase === 'SLEEP_TRANSITION') {
+      audioManager.playTrack('night');
+    } else {
+      audioManager.playTrack('day');
+    }
+  }, [gameStore.phase]);
 
   // NPC speaker colour map – bright enough to read on the dark dialogue box
   const NPC_DIALOGUE_COLORS: Record<string, string> = {
@@ -154,6 +168,20 @@ export default function Game() {
       }
     }, 200);
     return () => clearInterval(interval);
+  }, []);
+
+  // ---------------------------------------------------------------------------
+  // Global button tap sound — plays on any <button> click in the UI overlay
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      const target = e.target as HTMLElement;
+      if (target.closest('button')) {
+        audioManager.buttonTap();
+      }
+    }
+    document.addEventListener('click', handleClick, true);
+    return () => document.removeEventListener('click', handleClick, true);
   }, []);
 
   // Get giftable items for dialogue

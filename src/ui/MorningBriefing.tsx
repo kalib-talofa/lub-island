@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { audioManager } from "@/utils/audio";
 
 interface MorningBriefingProps {
   day: number;
@@ -57,6 +58,9 @@ export default function MorningBriefing({
         if (timerRef.current) clearInterval(timerRef.current);
       } else {
         setDisplayedText(narration.slice(0, charIndex.current));
+        if (charIndex.current % 2 === 0 && narration[charIndex.current - 1] !== ' ') {
+          audioManager.typewriterTick();
+        }
       }
     }, 35);
 

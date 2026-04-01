@@ -23,7 +23,8 @@
       "Bash(timeout 3)",
       "Bash(node -e \":*)",
       "Bash(node -e \"const path = require\\(''path''\\); const p = require.resolve\\(''three/examples/jsm/utils/SkeletonUtils.js''\\); console.log\\(p\\);\")",
-      "Bash(ls C:/Users/kalib/Documents/Supercell/LubIsland/*.md)"
+      "Bash(ls C:/Users/kalib/Documents/Supercell/LubIsland/*.md)",
+      "Bash(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 \"C:/Users/kalib/Documents/Supercell/LubIsland/public/audio/DayMusic.mp3\")"
     ]
   }
 }

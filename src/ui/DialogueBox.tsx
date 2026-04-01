@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import type { ItemDef } from "@/characters/CharacterData";
+import { audioManager } from "@/utils/audio";
 
 interface DialogueChoice {
   text: string;
@@ -72,6 +73,10 @@ export default function DialogueBox({
         if (timerRef.current) clearInterval(timerRef.current);
       } else {
         setDisplayedText(line.text.slice(0, charIndex.current));
+        // Play tick on non-space characters (every other char to avoid buzzing)
+        if (charIndex.current % 2 === 0 && line.text[charIndex.current - 1] !== ' ') {
+          audioManager.typewriterTick();
+        }
       }
     }, 30);
 

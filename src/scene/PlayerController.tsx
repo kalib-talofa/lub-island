@@ -243,6 +243,7 @@ export default function PlayerController({
 
   const enterVilla = useGameStore((s) => s.enterVilla);
   const exitVilla = useGameStore((s) => s.exitVilla);
+  const isNight = useGameStore((s) => s.phase === 'NIGHTTIME_FREE');
 
   // Initialise module-level refs once
   useMemo(() => {
@@ -384,6 +385,16 @@ export default function PlayerController({
   // ---- render ------------------------------------------------------------
   return (
     <group ref={groupRef} position={position}>
+      {isNight && (
+        <pointLight
+          color="#ffe8a0"
+          intensity={6}
+          distance={8}
+          decay={2}
+          position={[0, 1.2, 0]}
+          castShadow={false}
+        />
+      )}
       <Suspense fallback={null}>
         <FerretCharacter isMoving={isMoving} />
       </Suspense>
