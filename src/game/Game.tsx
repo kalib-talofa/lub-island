@@ -366,8 +366,11 @@ export default function Game() {
               <span className="text-[10px] font-bold uppercase tracking-wider text-white/70">
                 Items
               </span>
-              <span className="ml-auto text-[10px] font-semibold text-white/50">
+              <span className="text-[10px] font-semibold text-white/50">
                 {state.nightDropsOriginal.length - state.droppedItems.length}/{state.nightDropsOriginal.length}
+              </span>
+              <span className="ml-auto text-[9px] italic text-white/40">
+                (optional)
               </span>
             </div>
 

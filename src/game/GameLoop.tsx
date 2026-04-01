@@ -227,7 +227,9 @@ export function useGameLoop() {
   // ---------------------------------------------------------------------------
 
   const handleItemPickup = useCallback((dropId: string) => {
-    const drop = state.droppedItems.find(d => d.dropId === dropId);
+    // Read from the module-level ref (always in sync) to avoid
+    // depending on state.droppedItems and recreating this callback.
+    const drop = droppedItemsRef.current.find(d => d.dropId === dropId);
     if (!drop) return;
 
     playerStore.addItem(drop.item);
@@ -241,7 +243,7 @@ export function useGameLoop() {
       itemPopupName: `Found: ${drop.item.name}`,
       itemPopupDesc: drop.item.description,
     }));
-  }, [state.droppedItems, playerStore]);
+  }, [playerStore]);
 
   // ---------------------------------------------------------------------------
   // Game flow
