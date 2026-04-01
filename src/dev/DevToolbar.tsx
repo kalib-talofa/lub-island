@@ -8,6 +8,8 @@ import { useRelationshipStore } from '@/store/relationshipStore';
 import { usePlayerStore } from '@/store/playerStore';
 import { cameraAngleRef } from '@/scene/IsometricCamera';
 import { ITEM_DEFS, JOURNAL_DEFS } from '@/systems/items';
+import { droppedItemsRef } from '@/game/GameLoop';
+import { playerPositionRef } from '@/scene/PlayerController';
 
 export default function DevToolbar() {
   const [visible, setVisible] = useState(true);
@@ -126,6 +128,20 @@ export default function DevToolbar() {
       });
     });
 
+    // Night drops tracker
+    const nightFolder = gui.addFolder('🌙 Night Drops');
+    nightFolder.close();
+
+    const MAX_DROPS = 4;
+    const posProxy = { playerX: '—', playerZ: '—' };
+    const playerXCtrl = nightFolder.add(posProxy, 'playerX').name('Player X').disable();
+    const playerZCtrl = nightFolder.add(posProxy, 'playerZ').name('Player Z').disable();
+
+    const dropProxies = Array.from({ length: MAX_DROPS }, (_, i) => ({ label: '—' }));
+    const dropCtrls = dropProxies.map((p, i) =>
+      nightFolder.add(p, 'label').name(`Drop ${i + 1}`).disable()
+    );
+
     // Update display periodically
     const interval = setInterval(() => {
       const bio = useBiometricStore.getState();
@@ -157,6 +173,27 @@ export default function DevToolbar() {
         }
       });
       relFolder.controllersRecursive().forEach(c => c.updateDisplay());
+
+      // Night drops
+      const px = playerPositionRef.current;
+      posProxy.playerX = px.x.toFixed(1);
+      posProxy.playerZ = px.z.toFixed(1);
+      playerXCtrl.updateDisplay();
+      playerZCtrl.updateDisplay();
+
+      const drops = droppedItemsRef.current;
+      dropProxies.forEach((p, i) => {
+        const drop = drops[i];
+        if (drop) {
+          const loc = drop.isIndoors
+            ? 'Villa (indoors)'
+            : `(${drop.position[0].toFixed(1)}, ${drop.position[2].toFixed(1)})`;
+          p.label = `${drop.item.name} — ${loc}`;
+        } else {
+          p.label = '—';
+        }
+        dropCtrls[i].updateDisplay();
+      });
     }, 500);
 
     return () => {
