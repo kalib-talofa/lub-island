@@ -14,11 +14,12 @@ import { DialogueRunner, DialogueLine } from '@/utils/ink';
 import { ENERGY_COSTS, PROD_ENERGY, FTUE_ARRIVALS, UNLOCKABLE_STRUCTURES, getDaysInWeek } from '@/game/constants';
 import { cameraPanTargetRef } from '@/scene/IsometricCamera';
 import { isCeremonyDay, isFreeRoamDay } from '@/systems/calendar';
-import { getStructureLockMessage } from '@/game/unlocks';
+import { getStructureLockMessage, isStructureUnlocked } from '@/game/unlocks';
 import { EventType, GameEvent, ItemDef } from '@/characters/CharacterData';
 import { getRelationshipReward } from '@/systems/challenge';
-import { generateNightlyDrops, DroppedItem } from '@/systems/items';
+import { generateNightlyDrops, DroppedItem, getItemById } from '@/systems/items';
 import { ZONE_POSITIONS } from '@/scene/IslandEnvironment';
+import { DOCK_INTERIOR } from '@/scene/DockInterior';
 import { playerPositionRef } from '@/scene/PlayerController';
 import { npcPositionsRef } from '@/scene/NPCController';
 
@@ -641,9 +642,12 @@ export function useGameLoop() {
 
   // Spawn nightly drops — also assigned to triggerNightSpawnRef for dev toolbar
   const spawnNightlyDrops = useCallback(() => {
-    const drops = generateNightlyDrops(ZONE_POSITIONS);
+    const outdoorDrops = generateNightlyDrops(ZONE_POSITIONS);
+    // Preserve existing indoor drops (e.g. dock chocolate)
+    const indoorDrops = droppedItemsRef.current.filter(d => d.isIndoors);
+    const drops = [...indoorDrops, ...outdoorDrops];
     droppedItemsRef.current = drops;
-    setState(s => ({ ...s, droppedItems: drops, nightDropsOriginal: drops }));
+    setState(s => ({ ...s, droppedItems: drops, nightDropsOriginal: outdoorDrops }));
   }, []);
   triggerNightSpawnRef.current = spawnNightlyDrops;
 
@@ -708,7 +712,21 @@ export function useGameLoop() {
     const hasArrivals = newNPCArrivals.length > 0 || newStructures.length > 0;
 
     gameStore.advanceDay();
-    droppedItemsRef.current = [];
+
+    // Spawn daily dock chocolate if dock is unlocked
+    const dockDrops: DroppedItem[] = [];
+    if (isStructureUnlocked('dock', currentWeek, nextDay)) {
+      const chocItem = getItemById('chocolate');
+      if (chocItem) {
+        dockDrops.push({
+          dropId: `dock-choc-${currentWeek}-${nextDay}`,
+          item: chocItem,
+          position: DOCK_INTERIOR.CHOCOLATE_POSITION,
+          isIndoors: true,
+        });
+      }
+    }
+    droppedItemsRef.current = dockDrops;
 
     // Build cast with updated arrivals for event generation
     const updatedCast = STARTING_CAST.filter(c =>
@@ -725,7 +743,7 @@ export function useGameLoop() {
       producerChoice: null,
       completedEventIds: [],
       activeEventId: null,
-      droppedItems: [],
+      droppedItems: dockDrops,
       nightDropsOriginal: [],
       showArrivalsPopup: false,  // shown after morning briefing + producer are dismissed
       arrivalsNPCIds: newNPCArrivals,

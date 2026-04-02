@@ -13,7 +13,7 @@ interface GameStore {
   isNight: boolean;
   isRainy: boolean;
   isIndoors: boolean;
-  indoorLocation: 'villa' | 'cave' | null;
+  indoorLocation: 'villa' | 'cave' | 'dock' | null;
   arrivedNPCIds: string[];
   currentEventType: EventType | null;
 
@@ -29,6 +29,8 @@ interface GameStore {
   exitVilla: () => void;
   enterCave: () => void;
   exitCave: () => void;
+  enterDock: () => void;
+  exitDock: () => void;
   setArrivedNPCIds: (ids: string[]) => void;
   addArrivedNPCs: (ids: string[]) => void;
   resetWeek: () => void;
@@ -100,6 +102,8 @@ export const useGameStore = create<GameStore>((set) => ({
   exitVilla: () => set({ isIndoors: false, indoorLocation: null }),
   enterCave: () => set({ isIndoors: true, indoorLocation: 'cave' }),
   exitCave: () => set({ isIndoors: false, indoorLocation: null }),
+  enterDock: () => set({ isIndoors: true, indoorLocation: 'dock' }),
+  exitDock: () => set({ isIndoors: false, indoorLocation: null }),
   setArrivedNPCIds: (ids) => set({ arrivedNPCIds: ids }),
   addArrivedNPCs: (ids) => set((s) => ({
     arrivedNPCIds: [...s.arrivedNPCIds, ...ids.filter(id => !s.arrivedNPCIds.includes(id))],

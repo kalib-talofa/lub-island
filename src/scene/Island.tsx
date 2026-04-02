@@ -6,6 +6,7 @@ import IslandEnvironment from "@/scene/IslandEnvironment";
 import RainSystem from "@/scene/RainSystem";
 import VillaInterior from "@/scene/VillaInterior";
 import CaveInterior from "@/scene/CaveInterior";
+import DockInterior from "@/scene/DockInterior";
 import PlayerController from "@/scene/PlayerController";
 import NPCController from "@/scene/NPCController";
 import ItemPickups from "@/scene/ItemPickups";
@@ -80,6 +81,19 @@ export default function Island({ onNPCInteract, onBedInteract, onLockedStructure
           {/* Cave interior scene */}
           <CaveInterior isNight={isNight} />
           <PlayerController position={[0, 0, 4.5]} isMovementLocked={movementLocked} isIndoors indoorLocation="cave" />
+        </>
+      ) : indoorLocation === 'dock' ? (
+        <>
+          {/* Dock interior scene */}
+          <DockInterior isNight={isNight} />
+          <PlayerController position={[0, 0, 3.5]} isMovementLocked={movementLocked} isIndoors indoorLocation="dock" />
+          {/* Dock item pickups (daily chocolate) */}
+          {droppedItems.length > 0 && onItemPickup && (
+            <ItemPickups
+              drops={droppedItems.filter(d => d.isIndoors)}
+              onPickup={onItemPickup}
+            />
+          )}
         </>
       ) : (
         <>

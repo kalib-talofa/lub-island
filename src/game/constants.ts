@@ -165,6 +165,36 @@ export function isRainyDay(week: number, day: number): boolean {
 }
 
 // ---------------------------------------------------------------------------
+// Egg Spoon Race mini-game
+// ---------------------------------------------------------------------------
+export const EGG_RACE = {
+  TOTAL_ROUNDS: 5,
+  // Per-leg timing (seconds)
+  RUN_MIN: 2.0,
+  RUN_MAX: 3.0,
+  HANDOFF: 0.35,
+  DROP_PAUSE: 0.5,
+  RETURN_DUR: 1.3,
+  // Player drop chance when "Do Your Best" = max(MIN, BASE - rel*FACTOR)
+  PLAYER_DROP_BASE: 0.45,
+  PLAYER_DROP_FACTOR: 0.004,
+  PLAYER_DROP_MIN: 0.05,
+  // Partner drop chance = max(MIN, BASE - rel*FACTOR)
+  PARTNER_DROP_BASE: 0.28,
+  PARTNER_DROP_FACTOR: 0.002,
+  PARTNER_DROP_MIN: 0.05,
+  // Score thresholds
+  GOLD_EGGS: 5,
+  SILVER_EGGS: 3,
+  // 3-D world positions
+  FIELD_Z: -56,           // field center Z
+  FIELD_HALF_X: 10,       // characters run from -10 to +10 in world X
+  LANE_SPACING: 2.5,      // Z separation between lanes (local to field group)
+  SPECTATOR_POS: [0, 0, -49] as [number, number, number],
+  RETURN_POS:    [-28, 0, 2] as [number, number, number],
+} as const;
+
+// ---------------------------------------------------------------------------
 // Land plots: each NPC arrival adds a new land mass around the base island.
 // center = world position of the plot, semiX/semiZ = ellipse half-axes.
 // The zone key must match the value in NPC_ZONE_UNLOCKS.

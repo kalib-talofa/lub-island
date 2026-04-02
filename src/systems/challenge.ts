@@ -1,8 +1,8 @@
 'use strict';
 
-import { COCONUT_CATCH, RELATIONSHIP } from '@/game/constants';
+import { COCONUT_CATCH, RELATIONSHIP, EGG_RACE } from '@/game/constants';
 
-type ScoreTier = 'bronze' | 'silver' | 'gold';
+export type ScoreTier = 'bronze' | 'silver' | 'gold';
 
 /**
  * Calculate how fast coconuts fall based on the player's Performance stat.
@@ -48,4 +48,35 @@ export function getRelationshipReward(tier: ScoreTier): number {
     case 'bronze':
       return RELATIONSHIP.CHALLENGE_BRONZE;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Egg Spoon Race helpers
+// ---------------------------------------------------------------------------
+
+/** Tier earned from egg spoon race. */
+export function getEggRaceTier(eggsDelivered: number): ScoreTier {
+  if (eggsDelivered >= EGG_RACE.GOLD_EGGS) return 'gold';
+  if (eggsDelivered >= EGG_RACE.SILVER_EGGS) return 'silver';
+  return 'bronze';
+}
+
+/**
+ * Player drop chance.
+ * sabotage = guaranteed drop; best = clamped probability based on relationship.
+ */
+export function getPlayerDropChance(relationship: number, intent: 'best' | 'sabotage'): number {
+  if (intent === 'sabotage') return 1.0;
+  return Math.max(
+    EGG_RACE.PLAYER_DROP_MIN,
+    EGG_RACE.PLAYER_DROP_BASE - relationship * EGG_RACE.PLAYER_DROP_FACTOR,
+  );
+}
+
+/** Partner (NPC) drop chance — decreases with relationship. */
+export function getPartnerDropChance(relationship: number): number {
+  return Math.max(
+    EGG_RACE.PARTNER_DROP_MIN,
+    EGG_RACE.PARTNER_DROP_BASE - relationship * EGG_RACE.PARTNER_DROP_FACTOR,
+  );
 }

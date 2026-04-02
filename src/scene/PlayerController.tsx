@@ -9,6 +9,7 @@ import { PLAYER, CAVE_POSITION, LAND_PLOTS } from "@/game/constants";
 import { ZONE_POSITIONS } from "@/scene/IslandEnvironment";
 import { VILLA_INTERIOR, BED_POSITIONS } from "@/scene/VillaInterior";
 import { CAVE_INTERIOR } from "@/scene/CaveInterior";
+import { DOCK_INTERIOR } from "@/scene/DockInterior";
 import { useGameStore } from "@/store/gameStore";
 import { isZoneUnlocked, isStructureUnlocked } from "@/game/unlocks";
 
@@ -257,6 +258,59 @@ function isAtCaveDoorOutside(x: number, z: number): boolean {
   return dx * dx + dz * dz < CAVE_DOOR_OUTDOOR.radius * CAVE_DOOR_OUTDOOR.radius;
 }
 
+// ---------------------------------------------------------------------------
+// Dock interior colliders & boundary
+// ---------------------------------------------------------------------------
+
+const DOCK_INTERIOR_COLLIDERS: CircleCollider[] = [
+  // Crate
+  { cx: 3, cz: -3, radius: 0.7 },
+  // Barrel
+  { cx: -3.5, cz: -3.5, radius: 0.5 },
+  // Lantern post
+  { cx: -4.2, cz: 3, radius: 0.3 },
+];
+
+/** Check if player is within the dock platform bounds */
+function withinDockPlatform(x: number, z: number, margin: number): boolean {
+  const halfW = DOCK_INTERIOR.PLATFORM_WIDTH / 2 - margin;
+  const halfD = DOCK_INTERIOR.PLATFORM_DEPTH / 2 - margin;
+  return x > -halfW && x < halfW && z > -halfD && z < halfD;
+}
+
+/** Check if player is at the dock exit zone (−Z edge, top-right in isometric) */
+function isAtDockExit(x: number, z: number): boolean {
+  const doorHalf = DOCK_INTERIOR.EXIT_WIDTH / 2;
+  return x > -doorHalf && x < doorHalf && z < DOCK_INTERIOR.EXIT_Z + 1.0;
+}
+
+// Dock entrance trigger zone on the outdoor island (front of the pier)
+const DOCK_DOOR_OUTDOOR = {
+  x: ZONE_POSITIONS.dock[0],
+  z: ZONE_POSITIONS.dock[2] - 0.5,
+  radius: 1.2,
+};
+
+function isAtDockDoorOutside(x: number, z: number): boolean {
+  const dx = x - DOCK_DOOR_OUTDOOR.x;
+  const dz = z - DOCK_DOOR_OUTDOOR.z;
+  return dx * dx + dz * dz < DOCK_DOOR_OUTDOOR.radius * DOCK_DOOR_OUTDOOR.radius;
+}
+
+// Dock colliders when UNLOCKED — block walking along the pier sides, only entrance is from the front
+const DOCK_UNLOCKED_COLLIDERS: CircleCollider[] = [
+  // Left side of pier
+  { cx: ZONE_POSITIONS.dock[0] - 1.5, cz: ZONE_POSITIONS.dock[2] + 2, radius: 1.0 },
+  { cx: ZONE_POSITIONS.dock[0] - 1.5, cz: ZONE_POSITIONS.dock[2] + 5, radius: 1.0 },
+  { cx: ZONE_POSITIONS.dock[0] - 1.5, cz: ZONE_POSITIONS.dock[2] + 8, radius: 1.0 },
+  // Right side of pier
+  { cx: ZONE_POSITIONS.dock[0] + 1.5, cz: ZONE_POSITIONS.dock[2] + 2, radius: 1.0 },
+  { cx: ZONE_POSITIONS.dock[0] + 1.5, cz: ZONE_POSITIONS.dock[2] + 5, radius: 1.0 },
+  { cx: ZONE_POSITIONS.dock[0] + 1.5, cz: ZONE_POSITIONS.dock[2] + 8, radius: 1.0 },
+  // End of pier
+  { cx: ZONE_POSITIONS.dock[0], cz: ZONE_POSITIONS.dock[2] + 10, radius: 1.5 },
+];
+
 // Locked structure proximity radius
 const LOCKED_PROXIMITY_RADIUS = 4.0;
 
@@ -341,7 +395,7 @@ interface PlayerControllerProps {
   position?: [number, number, number];
   isMovementLocked: boolean;
   isIndoors?: boolean;
-  indoorLocation?: 'villa' | 'cave' | null;
+  indoorLocation?: 'villa' | 'cave' | 'dock' | null;
   sleepingNPCs?: string[];
   onBedInteract?: (npcId: string, isSleeping: boolean) => void;
   onLockedStructure?: (key: string) => void;
@@ -368,6 +422,8 @@ export default function PlayerController({
   const exitVilla = useGameStore((s) => s.exitVilla);
   const enterCave = useGameStore((s) => s.enterCave);
   const exitCave = useGameStore((s) => s.exitCave);
+  const enterDock = useGameStore((s) => s.enterDock);
+  const exitDock = useGameStore((s) => s.exitDock);
   const arrivedNPCIds = useGameStore((s) => s.arrivedNPCIds);
   const week = useGameStore((s) => s.week);
   const day = useGameStore((s) => s.day);
@@ -385,7 +441,9 @@ export default function PlayerController({
     } else {
       colliders.push(...CAVE_LOCKED_COLLIDERS);
     }
-    if (!isStructureUnlocked('dock', week, day)) {
+    if (isStructureUnlocked('dock', week, day)) {
+      colliders.push(...DOCK_UNLOCKED_COLLIDERS);
+    } else {
       colliders.push(...DOCK_LOCKED_COLLIDERS);
     }
     return colliders;
@@ -447,7 +505,35 @@ export default function PlayerController({
       const nextZ = playerPositionRef.current.z + worldZ * speed;
 
       if (isIndoors) {
-        if (indoorLocation === 'cave') {
+        if (indoorLocation === 'dock') {
+          // ---- INDOOR movement (dock interior) ----
+          const inPlatform = withinDockPlatform(nextX, nextZ, PLAYER.COLLISION_RADIUS);
+
+          if (inPlatform) {
+            const resolved = resolveSlide(
+              playerPositionRef.current.x, playerPositionRef.current.z,
+              nextX, nextZ,
+              PLAYER.COLLISION_RADIUS,
+              DOCK_INTERIOR_COLLIDERS,
+            );
+            if (withinDockPlatform(resolved.x, resolved.z, PLAYER.COLLISION_RADIUS)) {
+              playerPositionRef.current.x = resolved.x;
+              playerPositionRef.current.z = resolved.z;
+            }
+          }
+
+          // Check for dock exit
+          if (doorCooldown.current <= 0 && isAtDockExit(playerPositionRef.current.x, playerPositionRef.current.z)) {
+            doorCooldown.current = 1.0;
+            playerPositionRef.current.set(
+              DOCK_INTERIOR.EXIT_POSITION[0],
+              DOCK_INTERIOR.EXIT_POSITION[1],
+              DOCK_INTERIOR.EXIT_POSITION[2],
+            );
+            _preservePosition.current = true;
+            exitDock();
+          }
+        } else if (indoorLocation === 'cave') {
           // ---- INDOOR movement (cave interior) ----
           const inRoom = withinCaveRoom(nextX, nextZ, PLAYER.COLLISION_RADIUS);
 
@@ -526,6 +612,9 @@ export default function PlayerController({
         // Check for cave door entry (only when cave is unlocked)
         const caveUnlocked = isStructureUnlocked('cave', week, day);
         const nearCaveDoor = caveUnlocked && isAtCaveDoorOutside(nextX, nextZ);
+        // Check for dock entrance (only when dock is unlocked)
+        const dockUnlocked = isStructureUnlocked('dock', week, day);
+        const nearDockDoor = dockUnlocked && isAtDockDoorOutside(nextX, nextZ);
 
         if (nearVillaDoor && doorCooldown.current <= 0) {
           doorCooldown.current = 1.0;
@@ -543,6 +632,14 @@ export default function PlayerController({
             CAVE_INTERIOR.ENTRY_POSITION[2],
           );
           enterCave();
+        } else if (nearDockDoor && doorCooldown.current <= 0) {
+          doorCooldown.current = 1.0;
+          playerPositionRef.current.set(
+            DOCK_INTERIOR.ENTRY_POSITION[0],
+            DOCK_INTERIOR.ENTRY_POSITION[1],
+            DOCK_INTERIOR.ENTRY_POSITION[2],
+          );
+          enterDock();
         } else if (withinIslandBounds) {
           const resolved = resolveSlide(
             playerPositionRef.current.x, playerPositionRef.current.z,
