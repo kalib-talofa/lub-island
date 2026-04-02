@@ -12,7 +12,7 @@ import { droppedItemsRef, triggerNightSpawnRef } from '@/game/GameLoop';
 import { playerPositionRef } from '@/scene/PlayerController';
 
 export default function DevToolbar() {
-  const [visible, setVisible] = useState(true);
+  const [visible, setVisible] = useState(false);
   const guiRef = useRef<GUI | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
