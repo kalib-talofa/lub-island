@@ -212,28 +212,28 @@ export default function VillaInterior({ isNight, sleepingNPCs = [] }: VillaInter
         <meshStandardMaterial color={wallColor} roughness={0.9} />
       </mesh>
 
-      {/* Front wall (+Z) — with door opening */}
+      {/* Front wall (+Z) — with door opening, nearly transparent so camera can see inside */}
       <mesh position={[-roomW / 4 - 0.5, roomH / 2, roomD / 2]} rotation={[0, Math.PI, 0]}>
         <planeGeometry args={[roomW / 2 - 1, roomH]} />
-        <meshStandardMaterial color={wallColor} roughness={0.9} side={THREE.DoubleSide} />
+        <meshStandardMaterial color={wallColor} roughness={0.9} side={THREE.DoubleSide} transparent opacity={0.08} />
       </mesh>
       <mesh position={[roomW / 4 + 0.5, roomH / 2, roomD / 2]} rotation={[0, Math.PI, 0]}>
         <planeGeometry args={[roomW / 2 - 1, roomH]} />
-        <meshStandardMaterial color={wallColor} roughness={0.9} side={THREE.DoubleSide} />
+        <meshStandardMaterial color={wallColor} roughness={0.9} side={THREE.DoubleSide} transparent opacity={0.08} />
       </mesh>
       <mesh position={[0, roomH - 0.5, roomD / 2]} rotation={[0, Math.PI, 0]}>
         <planeGeometry args={[2, 1]} />
-        <meshStandardMaterial color={wallColor} roughness={0.9} side={THREE.DoubleSide} />
+        <meshStandardMaterial color={wallColor} roughness={0.9} side={THREE.DoubleSide} transparent opacity={0.08} />
       </mesh>
 
       {/* Door frame trim */}
       <mesh position={[-1, roomH / 2 - 0.5, roomD / 2 - 0.02]}>
         <boxGeometry args={[0.12, roomH - 1, 0.08]} />
-        <meshStandardMaterial color={trimColor} roughness={0.85} />
+        <meshStandardMaterial color={trimColor} roughness={0.85} transparent opacity={0.15} />
       </mesh>
       <mesh position={[1, roomH / 2 - 0.5, roomD / 2 - 0.02]}>
         <boxGeometry args={[0.12, roomH - 1, 0.08]} />
-        <meshStandardMaterial color={trimColor} roughness={0.85} />
+        <meshStandardMaterial color={trimColor} roughness={0.85} transparent opacity={0.15} />
       </mesh>
 
       {/* Door mat */}

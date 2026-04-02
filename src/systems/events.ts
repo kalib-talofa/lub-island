@@ -1,8 +1,8 @@
 'use strict';
 
 import type { Character, EventType, GameEvent } from '@/characters/CharacterData';
-import { ENERGY_COSTS, EVENTS_PER_DAY } from '@/game/constants';
-import { getDayType, getAvailableEventTypes } from '@/systems/calendar';
+import { ENERGY_COSTS, EVENTS_PER_DAY, FTUE_ARRIVALS } from '@/game/constants';
+import { isCeremonyDay, isFreeRoamDay, getAvailableEventTypes } from '@/systems/calendar';
 
 /** Deterministic id built from day + week + index. */
 function makeEventId(day: number, week: number, index: number): string {
@@ -115,72 +115,152 @@ function buildEvent(
 }
 
 /**
- * Generate the daily pool of EVENTS_PER_DAY events based on the weekly
- * schedule and the current cast.
- *
- * Ceremony days produce no events (empty array).
+ * Build an arrival event for a specific NPC (used in FTUE).
  */
-export function generateDailyEvents(
+function buildArrivalEvent(
+  title: string,
+  description: string,
+  npcId: string,
+  day: number,
+  week: number,
+  index: number,
+): GameEvent {
+  return {
+    id: makeEventId(day, week, index),
+    type: 'arrival',
+    title,
+    description,
+    energyCost: eventEnergyCost('arrival'),
+    location: 'Villa',
+    involvedNPCs: [npcId],
+  };
+}
+
+// ---------------------------------------------------------------------------
+// FTUE event generation (Week 1)
+// ---------------------------------------------------------------------------
+
+function generateFTUEEvents(
+  day: number,
+  cast: Character[],
+  arrivedNPCIds: string[],
+): GameEvent[] {
+  const events: GameEvent[] = [];
+
+  if (day === 1) {
+    // Day 1: Welcome to Island, A Fresh Face, New Arrival — each for one of the 3 starting NPCs
+    const day1NPCs = FTUE_ARRIVALS[1] ?? [];
+    const titles = ['Welcome to the Island', 'A Fresh Face', 'New Arrival'];
+    const descs = [
+      'Welcome the newest member of the island.',
+      'Someone new steps off the boat. First impressions matter!',
+      'A new islander has arrived and is ready to shake things up!',
+    ];
+    for (let i = 0; i < Math.min(EVENTS_PER_DAY, day1NPCs.length); i++) {
+      events.push(buildArrivalEvent(titles[i], descs[i], day1NPCs[i], day, 1, i));
+    }
+  } else if (day === 2) {
+    // Day 2: New Arrival (4th NPC), New Arrival (5th NPC), Challenge
+    const day2NPCs = FTUE_ARRIVALS[2] ?? [];
+    for (let i = 0; i < day2NPCs.length; i++) {
+      events.push(buildArrivalEvent(
+        'New Arrival',
+        `${day2NPCs[i].charAt(0).toUpperCase() + day2NPCs[i].slice(1)} has arrived on the island!`,
+        day2NPCs[i], day, 1, i,
+      ));
+    }
+    // Fill remaining slot with a challenge
+    events.push(buildEvent('challenge', day, 1, events.length, cast));
+  } else if (day === 3) {
+    // Day 3: New Arrival (6th NPC), Date, Drama
+    const day3NPCs = FTUE_ARRIVALS[3] ?? [];
+    if (day3NPCs.length > 0) {
+      events.push(buildArrivalEvent(
+        'New Arrival',
+        `${day3NPCs[0].charAt(0).toUpperCase() + day3NPCs[0].slice(1)} has arrived on the island!`,
+        day3NPCs[0], day, 1, 0,
+      ));
+    }
+    events.push(buildEvent('date', day, 1, 1, cast));
+    events.push(buildEvent('drama', day, 1, 2, cast));
+  }
+
+  return events;
+}
+
+// ---------------------------------------------------------------------------
+// Week 2+ event generation
+// ---------------------------------------------------------------------------
+
+function generateWeek2Events(
   day: number,
   week: number,
   cast: Character[],
   producerChoice?: EventType | null,
 ): GameEvent[] {
-  const dayType = getDayType(day);
-  if (dayType === 'ceremony') return [];
-
-  const availableTypes = getAvailableEventTypes(day);
+  const events: GameEvent[] = [];
+  const availableTypes = getAvailableEventTypes(day, week);
   if (availableTypes.length === 0) return [];
 
-  const events: GameEvent[] = [];
+  // Guaranteed event type by day-in-week
+  const guaranteedType: EventType | null =
+    (day === 1) ? 'social' :          // Day 1: social only
+    (day === 2) ? 'challenge' :       // Day 2: guaranteed challenge
+    (day === 3) ? 'date' :            // Day 3: guaranteed date
+    (day === 4) ? 'drama' :           // Day 4: guaranteed drama
+    null;
 
-  // Week 1, Day 1: fixed intro events for first-time experience
-  if (day === 1 && week === 1) {
-    const introTitles = ['Welcome to the Island', 'A Fresh Face', 'New Arrival'];
-    const introDescs = [
-      'Welcome the newest member of the island.',
-      'Someone new steps off the boat. First impressions matter!',
-      'A new islander has arrived and is ready to shake things up!',
-    ];
+  // Day 1 of week 2+: all social events
+  if (day === 1) {
     for (let i = 0; i < EVENTS_PER_DAY; i++) {
-      const npcs = pickRandomNPCs(cast, 2);
-      events.push({
-        id: makeEventId(day, week, i),
-        type: 'arrival',
-        title: introTitles[i],
-        description: introDescs[i],
-        energyCost: eventEnergyCost('arrival'),
-        location: 'Villa',
-        involvedNPCs: npcs.map(n => n.id),
-      });
+      events.push(buildEvent('social', day, week, i, cast));
     }
     return events;
   }
 
-  // Guaranteed event type for certain days (1-indexed day within the week)
-  const dayInWeek = ((day - 1) % 7) + 1;
-  const guaranteedType: EventType | null =
-    (dayInWeek === 2 || dayInWeek === 4) ? 'challenge' :
-    (dayInWeek === 3 || dayInWeek === 5) ? 'date' :
-    (dayInWeek === 6) ? 'drama' :
-    null;
-
-  // First event is always the "headline" type for the day
-  const headlineType: EventType =
-    guaranteedType ?? (dayType === 'free' ? pickRandom(availableTypes) : availableTypes[0]);
-
+  // First event is always the guaranteed type
+  const headlineType: EventType = guaranteedType ?? pickRandom(availableTypes);
   events.push(buildEvent(headlineType, day, week, 0, cast));
 
   // Pick which remaining slot gets the producer's choice (if any)
   const producerSlot = producerChoice ? 1 + Math.floor(Math.random() * (EVENTS_PER_DAY - 1)) : -1;
 
-  // Fill the remaining slots with available types
+  // Fill remaining slots
   for (let i = 1; i < EVENTS_PER_DAY; i++) {
     const type = (i === producerSlot && producerChoice) ? producerChoice : pickRandom(availableTypes);
     events.push(buildEvent(type, day, week, i, cast));
   }
 
   return events;
+}
+
+// ---------------------------------------------------------------------------
+// Public API
+// ---------------------------------------------------------------------------
+
+/**
+ * Generate the daily pool of events based on the week and day.
+ *
+ * Ceremony days and free-roam days produce no events (empty array).
+ */
+export function generateDailyEvents(
+  day: number,
+  week: number,
+  cast: Character[],
+  producerChoice?: EventType | null,
+  arrivedNPCIds?: string[],
+): GameEvent[] {
+  // Ceremony days and free-roam days have no events
+  if (isCeremonyDay(day, week)) return [];
+  if (isFreeRoamDay(day, week)) return [];
+
+  // Week 1: fully baked FTUE events
+  if (week === 1) {
+    return generateFTUEEvents(day, cast, arrivedNPCIds ?? []);
+  }
+
+  // Week 2+: normal event generation
+  return generateWeek2Events(day, week, cast, producerChoice);
 }
 
 /**

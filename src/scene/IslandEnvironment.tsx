@@ -165,12 +165,20 @@ function Villa({ isNight }: { isNight: boolean }) {
   const roofTexture = useConfiguredTexture("/textures/RoofColor.png", [2, 2]);
   const wallTexture = useConfiguredTexture("/textures/WoodPanel.png", [2, 2]);
   const porchTexture = useConfiguredTexture("/textures/WoodPanelLong.png", [4, 1]);
+
+  // Per-face material array for building boxes: sides = wood, top (+Y face 2) = roof tile
+  const wallBoxMats = useMemo(() => {
+    const wall = new THREE.MeshStandardMaterial({ color: wallColor, map: wallTexture ?? undefined, roughness: 0.8 });
+    const top  = new THREE.MeshStandardMaterial({ color: roofColor, map: roofTexture ?? undefined, roughness: 0.85 });
+    // BoxGeometry face order: +X, -X, +Y (top), -Y (bottom), +Z, -Z
+    return [wall, wall, top, wall, wall, wall];
+  }, [wallColor, wallTexture, roofColor, roofTexture]);
+
   return (
     <group position={[ZONE_POSITIONS.villa[0], ZONE_POSITIONS.villa[1], ZONE_POSITIONS.villa[2]]}>
       {/* Main hall */}
-      <mesh castShadow receiveShadow position={[0, 1.5, 0]}>
+      <mesh castShadow receiveShadow position={[0, 1.5, 0]} material={wallBoxMats}>
         <boxGeometry args={[6, 3, 5]} />
-        <meshStandardMaterial color={wallColor} map={wallTexture} roughness={0.8} />
       </mesh>
       {/* Roof */}
       <mesh castShadow position={[0, 3.3, 0]} rotation={[0, Math.PI / 4, 0]}>
@@ -179,9 +187,8 @@ function Villa({ isNight }: { isNight: boolean }) {
       </mesh>
 
       {/* Left wing room */}
-      <mesh castShadow receiveShadow position={[-4.5, 1.0, 0]}>
+      <mesh castShadow receiveShadow position={[-4.5, 1.0, 0]} material={wallBoxMats}>
         <boxGeometry args={[3, 2, 3.5]} />
-        <meshStandardMaterial color={wallColor} map={wallTexture} roughness={0.8} />
       </mesh>
       <mesh castShadow position={[-4.5, 2.25, 0]} rotation={[0, 0, 0]}>
         <coneGeometry args={[2.8, 1.0, 4]} />
@@ -189,9 +196,8 @@ function Villa({ isNight }: { isNight: boolean }) {
       </mesh>
 
       {/* Right wing room */}
-      <mesh castShadow receiveShadow position={[4.5, 1.0, 0]}>
+      <mesh castShadow receiveShadow position={[4.5, 1.0, 0]} material={wallBoxMats}>
         <boxGeometry args={[3, 2, 3.5]} />
-        <meshStandardMaterial color={wallColor} map={wallTexture} roughness={0.8} />
       </mesh>
       <mesh castShadow position={[4.5, 2.25, 0]} rotation={[0, 0, 0]}>
         <coneGeometry args={[2.8, 1.0, 4]} />

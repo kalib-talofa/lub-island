@@ -27,7 +27,12 @@ export const BIO_TARGETS = {
   STEPS_MAX: 10000,
 } as const;
 
-// Days per week
+// Week lengths
+/** Week 1 (FTUE): 3 play days + ceremony = 4. Week 2+: 5 play days + ceremony = 6. */
+export function getDaysInWeek(week: number): number {
+  return week === 1 ? 4 : 6;
+}
+/** @deprecated – use getDaysInWeek(week) for week-aware logic */
 export const DAYS_PER_WEEK = 7;
 export const EVENTS_PER_DAY = 3;
 export const MAX_INVENTORY = 3;
@@ -83,15 +88,40 @@ export const CEREMONY = {
   RANDOM_FACTOR_MAX: 0.15,
 } as const;
 
-// Weekly schedule - what kind of day each day is
-export const WEEKLY_SCHEDULE = [
-  'arrival',    // Day 1
-  'free',       // Day 2
-  'challenge',  // Day 3
-  'date',       // Day 4
-  'drama',      // Day 5
-  'free',       // Day 6
-  'ceremony',   // Day 7
+// Weekly schedules per week
+// Week 1 (FTUE - 4 days): arrival, arrival, mixed, ceremony
+export const WEEK1_SCHEDULE = [
+  'arrival',    // Day 1: 3 NPCs present, welcome events
+  'arrival',    // Day 2: 4th+5th NPC arrive
+  'free',       // Day 3: 6th NPC arrives, date + drama
+  'ceremony',   // Day 4: FTUE ceremony (no elimination)
 ] as const;
 
-export type DayType = typeof WEEKLY_SCHEDULE[number];
+// Week 2+ (6 days): social, challenge, date, drama, free, ceremony
+export const WEEK2_SCHEDULE = [
+  'free',       // Day 1: social events only
+  'challenge',  // Day 2: guaranteed challenge + randoms
+  'date',       // Day 3: guaranteed date + randoms
+  'drama',      // Day 4: guaranteed drama + randoms
+  'free',       // Day 5: free day (0 events, roam)
+  'ceremony',   // Day 6: real ceremony (elimination)
+] as const;
+
+/** @deprecated – use getWeekSchedule(week) instead */
+export const WEEKLY_SCHEDULE = WEEK2_SCHEDULE;
+
+export type DayType = 'arrival' | 'free' | 'challenge' | 'date' | 'drama' | 'ceremony';
+
+/** Get the schedule array for a given week. */
+export function getWeekSchedule(week: number): readonly DayType[] {
+  return week === 1 ? WEEK1_SCHEDULE : WEEK2_SCHEDULE;
+}
+
+// ---------------------------------------------------------------------------
+// FTUE NPC arrival schedule (Week 1)
+// ---------------------------------------------------------------------------
+export const FTUE_ARRIVALS: Record<number, string[]> = {
+  1: ['rosie', 'blaze', 'pudge'],   // Day 1: first 3 NPCs
+  2: ['kiki', 'sprocket'],           // Day 2: 4th + 5th
+  3: ['lily'],                       // Day 3: 6th
+};

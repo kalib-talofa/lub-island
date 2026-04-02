@@ -20,7 +20,10 @@
 
 ## 2. Core Loop
 
-The game follows a daily cycle that repeats within a 7-day week:
+The game follows a daily cycle that repeats within a variable-length week:
+
+- **Week 1 (FTUE):** 4 days (3 play days + ceremony). NPCs arrive progressively.
+- **Week 2+:** 6 days (5 play days + ceremony). All NPCs present.
 
 ```
   +------------------+
@@ -29,7 +32,7 @@ The game follows a daily cycle that repeats within a 7-day week:
            |
            v
   +------------------+
-  | MORNING_BRIEFING |  <-- Biometrics convert to stats; daily events revealed
+  | MORNING_BRIEFING |  <-- Stats reset; daily events revealed
   +--------+---------+
            |
            v
@@ -52,7 +55,9 @@ The game follows a daily cycle that repeats within a 7-day week:
   | SLEEP_TRANSITION |  <-- Day ends
   +--------+---------+
            |
-           +-------> If day == 7: CEREMONY --> RESULTS --> DEPARTURE --> DEMO_END
+           +-------> If next day is ceremony:
+           |           Week 1: FTUE_COMPLETE (no elimination) --> MORNING_BRIEFING (Week 2)
+           |           Week 2+: CEREMONY --> RESULTS --> DEPARTURE --> DEMO_END
            |
            +-------> Otherwise: MORNING_BRIEFING (next day)
 ```
@@ -73,7 +78,7 @@ There are **8 game phases** defined in `GamePhase`:
 | `EVENT` | An event is in progress (challenge, date, social, drama, arrival). | Participate in the event's mini-game or dialogue |
 | `NIGHTTIME_FREE` | Nighttime roaming. Some NPCs are asleep, others at the beach bonfire. | Talk to NPCs (free), explore |
 | `SLEEP_TRANSITION` | Screen transition to next day. | Continue |
-| `CEREMONY` | Recoupling ceremony (day 7 only). Player picks a partner, NPCs make choices. | Choose a partner from available cast |
+| `CEREMONY` | Recoupling ceremony (last day of week). Player picks a partner, NPCs make choices. Week 1 ceremony has no elimination. | Choose a partner (Week 2+) or review FTUE warning (Week 1) |
 | `CEREMONY_RESULT` | Shows who paired with whom and who was eliminated. | Continue to next week |
 
 **Transitions:**
@@ -82,36 +87,48 @@ There are **8 game phases** defined in `GamePhase`:
 - `DAYTIME_FREE` -> `EVENT` (trigger event) -> `DAYTIME_FREE` (event complete, events remaining > 0)
 - `DAYTIME_FREE` -> `NIGHTTIME_FREE` (all events completed)
 - `NIGHTTIME_FREE` -> `SLEEP_TRANSITION` (go to sleep)
-- `SLEEP_TRANSITION` -> `MORNING_BRIEFING` (next day, if day < 7)
-- `SLEEP_TRANSITION` -> `CEREMONY` (if day == 7)
-- `CEREMONY` (choosing) -> results -> departure -> demo_end -> `MAIN_MENU` (prototype; future: `MORNING_BRIEFING` for next week)
+- `SLEEP_TRANSITION` -> `MORNING_BRIEFING` (next day, if next day is not ceremony)
+- `SLEEP_TRANSITION` -> `CEREMONY` (if next day is ceremony)
+- `CEREMONY` (Week 1: ftue_complete -> `MORNING_BRIEFING` for Week 2)
+- `CEREMONY` (Week 2+: choosing -> results -> departure -> demo_end -> `MAIN_MENU`)
 
 ---
 
 ## 4. Weekly Cycle
 
-Each week is **7 days** (`DAYS_PER_WEEK = 7`). The `WEEKLY_SCHEDULE` determines what type of day it is:
+Week lengths are variable: **Week 1 is 4 days** (FTUE), **Week 2+ is 6 days**. Use `getDaysInWeek(week)` for the correct length. The HUD displays "Day X/N" where N is the week's total days.
+
+### Week 1 -- FTUE (First Time User Experience)
+
+Week 1 has a baked schedule with progressive NPC arrivals (`FTUE_ARRIVALS`):
+
+| Day | Type | NPCs Present | Events |
+|---|---|---|---|
+| 1 | `arrival` | Rosie, Blaze, Pudge (3 NPCs) | "Welcome to the Island", "A Fresh Face", "New Arrival" (all arrival type, one per starting NPC) |
+| 2 | `arrival` | + Kiki, Sprocket (5 NPCs) | 2x "New Arrival" (Kiki, Sprocket) + 1 Challenge |
+| 3 | `free` | + Lily (all 6 NPCs) | 1x "New Arrival" (Lily) + Date + Drama |
+| 4 | `ceremony` | All 6 NPCs | **No elimination** -- "Week 1 Complete!" screen with warning about Week 2 |
+
+### Week 2+ -- Normal Flow
+
+Week 2+ uses a 6-day schedule (`WEEK2_SCHEDULE`):
 
 | Day | Type | Headline Event | Available Event Types |
 |---|---|---|---|
-| 1 | `arrival` | New islander intro | `arrival`, `social` |
-| 2 | `free` | Player's choice | `social`, `date`, `challenge` |
-| 3 | `challenge` | Island challenge | `challenge`, `social` |
-| 4 | `date` | Romantic date | `date`, `social` |
-| 5 | `drama` | Drama/conflict | `drama`, `social` |
-| 6 | `free` | Player's choice | `social`, `date`, `challenge` |
-| 7 | `ceremony` | Recoupling ceremony | No events (ceremony only) |
+| 1 | `free` | Social-only day | All 3 events are `social` |
+| 2 | `challenge` | Guaranteed challenge | `challenge`, `social` |
+| 3 | `date` | Guaranteed date | `date`, `social` |
+| 4 | `drama` | Guaranteed drama | `drama`, `social` |
+| 5 | `free` | Free roam (0 events) | No events -- explore, talk, use items |
+| 6 | `ceremony` | Recoupling ceremony | No events (ceremony only) |
 
-On each non-ceremony day, 3 events are generated. The first event slot follows these rules:
-- **Week 1, Day 1:** Fixed intro sequence: "Welcome to the Island", "A Fresh Face", "New Arrival" (all `arrival` type, always in this order).
-- **Days 2 & 4:** First event is always a `challenge`.
-- **Days 3 & 5:** First event is always a `date`.
-- **Day 6:** First event is always a `drama`.
-- **Other non-ceremony days:** The first event matches the day's headline type (e.g., `challenge` on challenge day). On `free` days, the headline is randomly chosen from available types.
+On event days (Days 1-4), 3 events are generated. The first event slot is always the guaranteed type for that day. Remaining slots (2nd and 3rd) are filled randomly from available types. The producer's phone choice, if active, is placed in one of the non-guaranteed slots.
 
-Remaining event slots (2nd and 3rd) are filled randomly from available types.
+Free roam day (Day 5) and ceremony day (Day 6) produce no events. The "Advance to Night" button is available immediately. The HUD shows "Free day -- tie up loose ends before the ceremony!" in place of event buttons.
 
-Ceremony days (Day 7) produce no events. The day is a free roam period with 0 required events -- the "Advance to Night" button is available immediately. The player can use items and talk to NPCs before the ceremony. The HUD shows "Free day -- tie up loose ends before the ceremony!" in place of event buttons. The ceremony triggers after sleeping on Day 7.
+### Daily Stat Reset
+
+Each morning (on sleep continuation), stats reset to: Energy = 80, Charm = 30, Performance = 30. This replaces full biometric recalculation each day in the prototype.
 
 ---
 
@@ -133,8 +150,10 @@ Real-world biometric data converts to three in-game stats. All stats are clamped
 |---|---|---|
 | `sleepHours` | 7 | Energy ~61 (with 70% quality) |
 | `sleepQuality` | 70 | (factors into Energy) |
-| `activeMinutes` | 30 | Charm = 50 |
-| `stepCount` | 5000 | Performance = 50 |
+| `activeMinutes` | 18 | Charm = 30 |
+| `stepCount` | 3000 | Performance = 30 |
+
+Note: Each day on sleep, stats are reset to fixed values (Energy 80, Charm 30, Performance 30) rather than re-derived from biometrics. The biometric defaults above apply only at initial game start.
 
 ### God Mode
 
@@ -175,7 +194,7 @@ All NPC conversations at night cost 0 energy. This is a deliberate design choice
 
 ## 7. Character Roster
 
-Six starting NPCs (`STARTING_CAST`), all joining on Day 1:
+Six NPCs in `STARTING_CAST`. During Week 1 (FTUE), they arrive progressively: Day 1 (Rosie, Blaze, Pudge), Day 2 (Kiki, Sprocket), Day 3 (Lily). From Week 2 onward, all 6 are present.
 
 ### Rosie (rabbit)
 
@@ -308,7 +327,7 @@ The CeremonyUI uses a simplified label set: "Cold" (< -25), "Distant" (-25 to -1
 | Challenge: Silver tier | +8 | `CHALLENGE_SILVER` (applied to challenge partner only) |
 | Challenge: Bronze tier | -10 | `CHALLENGE_BRONZE` (penalty for poor performance, applied to challenge partner only) |
 | Night Chat Bonus | +3 | `NIGHT_CHAT_BONUS` |
-| Dialogue Choices | varies | Each dialogue choice has an `effects.relationship` value (typically +2 to +10) |
+| Dialogue Choices | varies | Each dialogue choice has an `effects.relationship_level` value (typically +2 to +10) |
 
 ### Dialogue Tier Boundaries
 
@@ -317,7 +336,20 @@ Dialogue scripts are selected based on relationship level:
 - **Mid** (20 <= relationship < 60): Warmer, more personal dialogues
 - **High** (relationship >= 60): Deep/romantic dialogues
 
-Each NPC has 3 dialogue scripts (low, mid, high) stored in `NPC_DIALOGUES`.
+Each NPC has 3 base dialogue scripts (low, mid, high) stored in `NPC_DIALOGUES`.
+
+### Daily Dialogue Progression
+
+In addition to the relationship-tiered base dialogues, each NPC has **daily dialogue scripts** stored in `src/characters/daily/` (126 total: 6 NPCs x 7 days x 3 relationship tiers). These are grouped by day and selected based on both the NPC's dialogue progress and the current relationship tier.
+
+**Progression rules:**
+- Each NPC tracks a `dialogueProgress` counter (module-level in `dialogueScripts.ts`), starting at 0.
+- When the player finishes a conversation with an NPC, `advanceNPCDialogue(npcId)` increments their progress by 1.
+- If the player does **not** talk to an NPC on a given day, that NPC stays on their current dialogue group the next day.
+- The dialogue group is capped at `totalDaysPlayed` -- an NPC cannot advance past the current game day's dialogues even if talked to multiple times.
+- `totalDaysPlayed` is a running counter across weeks (not reset on week change), used for dialogue day lookups.
+- If no daily dialogue is available (progress exceeded or day cap reached), the system falls back to the base relationship-tiered scripts.
+- Progress resets when a new game starts (`resetNPCDialogueProgress()`).
 
 ---
 
@@ -445,7 +477,7 @@ Group social events with 2 randomly selected NPCs. Costs 15 energy (`SOCIAL_EVEN
 
 **Social Locations:** Villa, Beach, Garden
 
-### 10d. Drama Events (Guaranteed on Day 6)
+### 10d. Drama Events (Guaranteed on Week 2+ Day 4)
 
 Conflict/revelation events with higher-stakes relationship outcomes. Same energy cost as social (15). Drama events use dedicated `DRAMA_DIALOGUES` scripts (one per NPC) featuring confrontations, secrets, and vulnerable moments.
 
@@ -467,11 +499,15 @@ New islander introduction events. Same energy cost as social (15). Currently use
 
 **Arrival Locations:** Villa
 
-### 10f. Ceremony (Day 7)
+### 10f. Ceremony (Last Day of Week)
 
-The recoupling ceremony is a special phase, not a standard event.
+The recoupling ceremony is a special phase, not a standard event. It occurs on the last day of each week (Day 4 in Week 1, Day 6 in Week 2+).
 
-**Ceremony Flow:**
+**Week 1 Ceremony (FTUE):**
+
+No partner choosing or elimination. The `ftue_complete` phase displays a "Week 1 Complete!" screen congratulating the player, with a warning that eliminations begin next week. All 6 NPCs become available. Clicking "Start Week 2" advances to Week 2, Day 1.
+
+**Week 2+ Ceremony Flow:**
 
 1. **Choosing Phase:** Player sees all active (non-eliminated) NPCs with their relationship values. Player selects one NPC as their partner.
 
@@ -495,7 +531,7 @@ The recoupling ceremony is a special phase, not a standard event.
 
 6. **Departure Phase:** A farewell screen showing each eliminated NPC's portrait, name, and catchphrase, with a "Has left the island" label. Below, a teaser shows a blacked-out silhouette with "A new islander is arriving soon..." text. "Continue to Next Week" advances.
 
-7. **Demo End Phase:** After the departure screen, a "Thanks for Playing!" screen appears indicating the demo is complete. A "Back to Menu" button returns the player to the main menu. (This is a prototype placeholder until multi-week gameplay is implemented.)
+7. **Demo End Phase:** After the departure screen, a "Thanks for Playing!" screen appears indicating the demo is complete. A "Back to Menu" button resets the game (relationships, eliminations, game state) and returns to the main menu.
 
 ---
 
@@ -591,6 +627,8 @@ The deterministic hash (`simpleHash`) ensures consistent behavior per NPC -- the
 
 **Night NPC Talk:** All nighttime conversations cost 0 energy (`TALK_NPC_NIGHT`), making nighttime the ideal time to build relationships without resource pressure. The `NIGHT_CHAT_BONUS` of +3 relationship is available for night chats.
 
+**Night UI:** The daytime event checklist is replaced with a simple exploration prompt: "Search the island for treasures, and go to bed whenever you're ready!" plus a "Go to Sleep" button.
+
 **Player Night Glow:** During `NIGHTTIME_FREE`, the player character emits a warm point light (color `#ffe8a0`, intensity 6, distance 8 units) as a lantern-like effect.
 
 ---
@@ -608,7 +646,7 @@ The game uses an isometric-style camera:
 | Near Plane | 0.1 | |
 | Far Plane | 1000 | |
 
-The camera angle is controlled by a 0-100 slider (`cameraAngleRef`), defaulting to 50. The slider interpolates between three offset presets (LOW, MID, HIGH) affecting both the camera position offset and zoom level. Pinch-to-zoom on touch devices maps to this same slider. The dev toolbar exposes the slider for testing.
+The camera angle is controlled by a 0-100 slider (`cameraAngleRef`), defaulting to 50. The slider interpolates between three offset presets (LOW, MID, HIGH) affecting both the camera position offset and zoom level. Three input methods map to the slider: pinch-to-zoom on touch devices, scroll wheel on desktop (adjusts by +/-5 per tick), and middle-click to reset to 50. The dev toolbar also exposes the slider for testing.
 
 ---
 
@@ -634,7 +672,7 @@ The following features are referenced in the design or partially stubbed but not
 
 4. **~~Real Audio:~~** *(Implemented)* Day and night music tracks play via Howler.js with crossfading. Synthesized SFX include typewriter ticks (dialogue/producer intro) and button tap sounds. Audio toggle is available on the main menu and in-game HUD.
 
-5. **Full 4-Week Season:** The prototype currently ends after Week 1's ceremony with a "Thanks for Playing" demo end screen. There is no concept of a season finale, winner declaration, or multi-week progression yet.
+5. **Full 4-Week Season:** The prototype plays through Week 1 (FTUE, no elimination) and Week 2 (normal flow with elimination), then shows a demo end screen. There is no concept of a season finale, winner declaration, or progression beyond Week 2 yet.
 
 6. **Complete NPC Dialogue Coverage:** Date dialogues only exist for Rosie and Kiki (`DATE_DIALOGUES`). Blaze, Pudge, Sprocket, and Lily need date scripts.
 

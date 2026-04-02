@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useGameStore } from "@/store/gameStore";
 import { useBiometricStore } from "@/store/biometricStore";
 import { usePlayerStore } from "@/store/playerStore";
-import { EVENTS_PER_DAY, DAYS_PER_WEEK } from "@/game/constants";
+import { EVENTS_PER_DAY, getDaysInWeek } from "@/game/constants";
 import { audioManager } from "@/utils/audio";
 
 interface HUDProps {
@@ -13,7 +13,7 @@ interface HUDProps {
 }
 
 export default function HUD({ onOpenInventory, onStatsTap }: HUDProps) {
-  const { day, isNight, eventsCompleted, phase } = useGameStore();
+  const { day, week, isNight, eventsCompleted, phase } = useGameStore();
   const { energy, charm, performance } = useBiometricStore();
   const { inventory, performanceBoostToday } = usePlayerStore();
 
@@ -38,7 +38,7 @@ export default function HUD({ onOpenInventory, onStatsTap }: HUDProps) {
         <div className="flex items-center gap-1.5 text-sm font-bold text-white">
           <span className="text-base">{isNight ? "\u{1F319}" : "\u{2600}\u{FE0F}"}</span>
           <span>
-            Day {day}/{DAYS_PER_WEEK}
+            Day {day}/{getDaysInWeek(week)}
           </span>
         </div>
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, useEffect } from "react";
 import * as THREE from "three";
 import { useThree, useFrame } from "@react-three/fiber";
 import { CAMERA } from "@/game/constants";
@@ -62,6 +62,32 @@ export default function IsometricCamera() {
   const smoothPosition = useRef(new THREE.Vector3());
   const smoothZoom = useRef(MID_ZOOM);
   const initialised = useRef(false);
+
+  useEffect(() => {
+    const handleWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      // Scroll up (deltaY < 0) → zoom in (lower angle value)
+      // Scroll down (deltaY > 0) → zoom out (higher angle value)
+      cameraAngleRef.current = THREE.MathUtils.clamp(
+        cameraAngleRef.current + (e.deltaY > 0 ? 5 : -5),
+        0, 100
+      );
+    };
+
+    const handleMiddleClick = (e: MouseEvent) => {
+      if (e.button === 1) {
+        e.preventDefault();
+        cameraAngleRef.current = 50; // Reset to default isometric angle
+      }
+    };
+
+    window.addEventListener('wheel', handleWheel, { passive: false });
+    window.addEventListener('mousedown', handleMiddleClick);
+    return () => {
+      window.removeEventListener('wheel', handleWheel);
+      window.removeEventListener('mousedown', handleMiddleClick);
+    };
+  }, []);
 
   useFrame(() => {
     // Ensure we're working with an orthographic camera

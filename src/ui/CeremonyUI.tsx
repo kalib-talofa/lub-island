@@ -8,10 +8,11 @@ interface CeremonyUIProps {
   cast: Character[];
   relationships: Record<string, number>;
   onChoosePartner: (npcId: string) => void;
-  phase: "choosing" | "results" | "departure" | "demo_end";
+  phase: "choosing" | "results" | "departure" | "demo_end" | "ftue_complete";
   results?: { npcId: string; partnerId: string | null }[];
   eliminated?: string[];
   onContinue: () => void;
+  week?: number;
 }
 
 const SPECIES_EMOJI: Record<string, string> = {
@@ -43,9 +44,49 @@ export default function CeremonyUI({
   results,
   eliminated,
   onContinue,
+  week = 2,
 }: CeremonyUIProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [confirmed, setConfirmed] = useState(false);
+
+  // ---- FTUE COMPLETE PHASE (Week 1 — no elimination) ----
+  if (phase === "ftue_complete") {
+    return (
+      <div className="fixed inset-0 z-50 flex flex-col bg-gradient-to-b from-amber-950 via-gray-900 to-gray-950">
+        <div className="flex flex-1 flex-col items-center justify-center gap-6 px-8">
+          <span className="text-6xl">{"\u{1F525}"}</span>
+          <h1 className="text-3xl font-extrabold tracking-wider text-amber-400">
+            Week 1 Complete!
+          </h1>
+          <p className="max-w-[320px] text-center text-base leading-relaxed text-white/70">
+            You&apos;ve survived your first week on Lub Island! Nobody goes home
+            this time...
+          </p>
+          <div className="my-2 h-px w-48 bg-white/10" />
+          <div className="flex flex-col items-center gap-2">
+            <span className="text-4xl">{"\u{26A0}\u{FE0F}"}</span>
+            <p className="max-w-[280px] text-center text-sm font-semibold leading-relaxed text-red-300">
+              But next week, things get real. Someone WILL be eliminated at the
+              next ceremony. Build strong relationships to stay safe!
+            </p>
+          </div>
+          <div className="my-1 h-px w-48 bg-white/10" />
+          <p className="text-xs text-white/40">
+            All 6 islanders are now on the island
+          </p>
+        </div>
+
+        <div className="px-4 pb-6">
+          <button
+            onClick={onContinue}
+            className="min-h-[52px] w-full rounded-2xl bg-gradient-to-r from-amber-500 to-yellow-500 py-3.5 text-lg font-bold text-black shadow-lg transition-all hover:scale-[1.02] active:scale-95"
+          >
+            Start Week 2
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   // ---- CHOOSING PHASE ----
   if (phase === "choosing") {

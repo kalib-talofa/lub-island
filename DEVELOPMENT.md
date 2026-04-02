@@ -13,7 +13,7 @@ npm run dev
 
 This runs Next.js with Turbopack. Visit **http://localhost:3000** in your browser.
 
-You should see a 3D island scene rendered via React Three Fiber. A virtual joystick appears at the bottom-left (touch/mouse), WASD keys work for keyboard movement, and the dev toolbar panel is open on the right side.
+You should see a 3D island scene rendered via React Three Fiber. A virtual joystick appears at the bottom-left (touch/mouse), WASD keys work for keyboard movement, and the dev toolbar panel is hidden by default (click the tab in the top-right corner to reveal it).
 
 ### Other Scripts
 
@@ -165,12 +165,12 @@ const myNpc_chat_low: DialogueScript = {
           condition: (v) => v.charm >= 40,         // optional charm gate
           lockMessage: 'Needs 40 charm.',           // shown when locked
           next: 'smooth_reply',
-          effects: { relationship: 8 },             // relationship delta
+          effects: { relationship_level: 8 },     // relationship delta (key must be relationship_level)
         },
         {
           text: '"A normal reply"',
           next: 'normal_reply',
-          effects: { relationship: 3 },
+          effects: { relationship_level: 3 },
         },
       ],
     },
@@ -188,7 +188,7 @@ const myNpc_chat_low: DialogueScript = {
 Key points:
 - `text` can be a string or a function `(vars) => string` for dynamic text.
 - `condition` on choices receives the current biometric/game vars object.
-- `effects.relationship` is a delta applied to the NPC's relationship score.
+- `effects.relationship_level` is a delta applied to the NPC's relationship score. The key **must** be `relationship_level` (not `relationship`) to match the variable read by the game loop.
 - A node with no `next` and no `choices` ends the conversation.
 
 ### Add a New Item
@@ -301,13 +301,13 @@ function TexturedGround() {
 
 - **Joystick vs keyboard listeners:** The virtual joystick writes directly to `joystickInputRef`. Synthetic `dispatchEvent` calls do NOT trigger the module-level `keydown` listeners in `PlayerController.tsx` -- only real user keyboard input works for WASD. The two input methods are independent.
 - **No save/load system.** All game state resets on page reload.
-- **Social events auto-complete.** Social events trigger NPC dialogue then immediately complete. They should have their own dedicated dialogue flow.
+- **Social event auto-complete.** Social and arrival events complete via `resolveDialogueEventCompletion()` when dialogue ends. If a player talks to an NPC organically (without pressing the event button) who matches an uncompleted social/arrival event, that event is auto-completed. ID-based tracking (`completedEventIds`, `activeEventId`) prevents double-completion.
 - **Nightly item drop positions are not structure-aware.** Nightly item drops may occasionally spawn inside structure colliders (buildings, fountains). Items are positioned with random offsets from zone centres and clamped to the island radius, but no structure collision check is performed on drop positions.
 - **Date dialogue coverage.** Date-specific dialogues only exist for Rosie and Kiki. Other NPCs fall back to regular chat scripts.
-- **Ceremony NPC logic.** The ceremony NPC decision doesn't account for existing NPC-to-NPC relationships. Elimination biases toward the most neutral player relationship (lowest absolute value). Exactly 1 NPC is eliminated per ceremony. The prototype ends after the first ceremony with a demo end screen.
+- **Ceremony NPC logic.** The ceremony NPC decision doesn't account for existing NPC-to-NPC relationships. Elimination biases toward the most neutral player relationship (lowest absolute value). Exactly 1 NPC is eliminated per Week 2+ ceremony. Week 1 ceremony has no elimination (FTUE). The prototype plays through Week 1 + Week 2, then shows a demo end screen and resets.
 - **Audio requires MP3 files.** Day and night music require `public/DayMusic.mp3` and `public/NightMusic.mp3`. If missing, music won't play but the game functions normally. SFX are synthesized via Web Audio API and don't need files.
 - **AI API routes return mock data.** No Anthropic API integration yet. The API routes serve static/random mock responses.
-- **New arrival event is non-functional.** The arrival event type exists but doesn't actually add a new NPC to the game world.
+- **FTUE arrival events.** Week 1 uses baked arrival events that introduce NPCs progressively (Day 1: 3 NPCs, Day 2: +2, Day 3: +1). The `arrivedNPCIds` state in `GameLoopState` tracks which NPCs have arrived. `activeCast` is filtered by both `!eliminated` and `arrivedNPCIds.includes(id)`. Week 2+ starts with all NPCs present.
 - **Collider approximations.** Structure colliders are circles. Box-shaped structures (like the Villa) use one or more circles to approximate their footprint. Some overlap/gaps are expected.
 - **`next-env.d.ts` is auto-generated.** Next.js manages this file. Do not edit it manually.
 
@@ -367,13 +367,15 @@ src/
 | --------------------------------- | ------------------------------------------------ |
 | `src/game/constants.ts`           | All game balance numbers                         |
 | `src/characters/roster.ts`        | NPC definitions (STARTING_CAST array)            |
-| `src/characters/dialogueScripts.ts` | All dialogue trees                             |
+| `src/characters/dialogueScripts.ts` | Dialogue trees + daily dialogue progression logic |
+| `src/characters/daily/`           | Per-NPC daily dialogue scripts (126 total)       |
 | `src/characters/CharacterData.ts` | Type definitions for Character, GameEvent, etc.  |
 | `src/scene/PlayerController.tsx`  | Player movement, WASD input, structure colliders |
 | `src/scene/NPCController.tsx`     | NPC positioning and zone offsets                 |
 | `src/scene/IslandEnvironment.tsx` | Island geometry and ZONE_POSITIONS               |
 | `src/systems/items.ts`            | Item definitions (ITEM_DEFS)                     |
-| `src/systems/events.ts`           | Event generation logic                           |
+| `src/systems/events.ts`           | Event generation logic (FTUE + Week 2+)          |
+| `src/systems/calendar.ts`         | Week-aware day types, ceremony/free day checks   |
 | `src/store/relationshipStore.ts`  | NPC relationship state                           |
 | `src/store/biometricStore.ts`     | Biometric data and derived stats                 |
 | `src/store/gameStore.ts`          | Game phase, day counter, events                  |

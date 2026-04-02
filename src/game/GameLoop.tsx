@@ -11,7 +11,8 @@ import { canAfford } from '@/systems/energy';
 import { calculateNPCChoice } from '@/systems/relationships';
 import { getDialogueForNPC, getDramaDialogueForNPC, markDialogueSeen, resetSeenDialogues, advanceNPCDialogue, resetNPCDialogueProgress } from '@/characters/dialogueScripts';
 import { DialogueRunner, DialogueLine } from '@/utils/ink';
-import { ENERGY_COSTS, PROD_ENERGY } from '@/game/constants';
+import { ENERGY_COSTS, PROD_ENERGY, FTUE_ARRIVALS, getDaysInWeek } from '@/game/constants';
+import { isCeremonyDay, isFreeRoamDay } from '@/systems/calendar';
 import { EventType, GameEvent, ItemDef } from '@/characters/CharacterData';
 import { getRelationshipReward } from '@/systems/challenge';
 import { generateNightlyDrops, DroppedItem } from '@/systems/items';
@@ -53,7 +54,7 @@ export interface GameLoopState {
   nightDropsOriginal: DroppedItem[];
 
   // Ceremony
-  ceremonyPhase: 'choosing' | 'results' | 'departure' | 'demo_end';
+  ceremonyPhase: 'choosing' | 'results' | 'departure' | 'demo_end' | 'ftue_complete';
   ceremonyResults: { npcId: string; partnerId: string | null }[];
   eliminatedThisCeremony: string[];
 
@@ -70,6 +71,14 @@ export interface GameLoopState {
 
   // Producer phone choice for next day
   producerChoice: EventType | null;
+
+  // ID-based event completion tracking (replaces counter-based i < completedCount)
+  completedEventIds: string[];
+  // ID of the event that was started via the event button — completed when dialogue ends
+  activeEventId: string | null;
+
+  // NPC arrival tracking (FTUE progressive arrivals)
+  arrivedNPCIds: string[];
 }
 
 /** Module-level ref so DevToolbar can read active drops without prop drilling */
@@ -115,13 +124,19 @@ export function useGameLoop() {
     dateNPCName: '',
     briefingEvents: [],
     producerChoice: null,
+    completedEventIds: [],
+    activeEventId: null,
+    arrivedNPCIds: [],
   });
 
 
-  // Get active (non-eliminated) cast
+  // Get active (non-eliminated, arrived) cast
   const activeCast = useMemo(() =>
-    STARTING_CAST.filter(c => !relStore.eliminated.includes(c.id)),
-    [relStore.eliminated]
+    STARTING_CAST.filter(c =>
+      !relStore.eliminated.includes(c.id) &&
+      state.arrivedNPCIds.includes(c.id)
+    ),
+    [relStore.eliminated, state.arrivedNPCIds]
   );
 
   // ---------------------------------------------------------------------------
@@ -263,7 +278,17 @@ export function useGameLoop() {
   const startGame = useCallback(() => {
     resetNPCDialogueProgress();
     gameStore.setPhase('MORNING_BRIEFING');
-    const events = generateDailyEvents(gameStore.day, gameStore.week, activeCast);
+
+    // Initialize NPC arrivals: Week 1 starts with only the first batch
+    const initialArrivals = gameStore.week === 1
+      ? (FTUE_ARRIVALS[1] ?? [])
+      : STARTING_CAST.filter(c => c.id !== 'player' && !relStore.eliminated.includes(c.id)).map(c => c.id);
+
+    const startCast = STARTING_CAST.filter(c =>
+      !relStore.eliminated.includes(c.id) && initialArrivals.includes(c.id)
+    );
+
+    const events = generateDailyEvents(gameStore.day, gameStore.week, startCast, null, initialArrivals);
     const briefingEvents = events.map(e => e.title);
 
     setState(s => ({
@@ -272,8 +297,11 @@ export function useGameLoop() {
       showMorningBriefing: true,
       dailyEvents: events,
       briefingEvents,
+      arrivedNPCIds: initialArrivals,
+      completedEventIds: [],
+      activeEventId: null,
     }));
-  }, [gameStore, activeCast]);
+  }, [gameStore, relStore]);
 
   // Continue from morning briefing
   const continueMorning = useCallback(() => {
@@ -308,7 +336,7 @@ export function useGameLoop() {
     }
 
     const relationship = relStore.getRelationship(npcId);
-    const script = getDialogueForNPC(npcId, relationship, gameStore.day);
+    const script = getDialogueForNPC(npcId, relationship, gameStore.totalDaysPlayed);
 
     const runner = new DialogueRunner(script, {
       charm: bio.charm,
@@ -334,6 +362,38 @@ export function useGameLoop() {
     }));
   }, [state.dialogueActive, gameStore, bio, relStore, playerStore]);
 
+  // Called when any dialogue ends. Marks the correct event as complete:
+  //   - If started via an event button (activeEventId set): mark that event done
+  //   - Otherwise: auto-complete a matching social/arrival event (organic interaction)
+  const resolveDialogueEventCompletion = useCallback((npcId: string | null) => {
+    const activeId = state.activeEventId;
+
+    // Event-button path: mark the exact event that was started
+    if (activeId) {
+      gameStore.completeEvent();
+      setState(s => ({
+        ...s,
+        activeEventId: null,
+        completedEventIds: [...s.completedEventIds, activeId],
+      }));
+      return;
+    }
+
+    // Organic path: check for a matching uncompleted social/arrival event
+    if (!npcId || gameStore.isNight || gameStore.eventsRemaining <= 0) return;
+    const match = state.dailyEvents.find(evt =>
+      (evt.type === 'social' || evt.type === 'arrival') &&
+      evt.involvedNPCs.includes(npcId) &&
+      !state.completedEventIds.includes(evt.id)
+    );
+    if (!match) return;
+    gameStore.completeEvent();
+    setState(s => ({
+      ...s,
+      completedEventIds: [...s.completedEventIds, match.id],
+    }));
+  }, [state.activeEventId, state.dailyEvents, state.completedEventIds, gameStore]);
+
   // Dialogue choice selected
   const handleDialogueChoice = useCallback((index: number) => {
     if (!state.currentDialogue) return;
@@ -354,6 +414,7 @@ export function useGameLoop() {
     if (!line || state.currentDialogue.isComplete()) {
       if (state.currentScriptId) markDialogueSeen(state.currentScriptId);
       if (state.currentNPCId) advanceNPCDialogue(state.currentNPCId);
+      resolveDialogueEventCompletion(state.currentNPCId);
       setState(s => ({
         ...s,
         dialogueActive: false,
@@ -366,7 +427,7 @@ export function useGameLoop() {
     }
 
     setState(s => ({ ...s, currentLine: line }));
-  }, [state.currentDialogue, state.currentNPCId, state.currentScriptId, relStore]);
+  }, [state.currentDialogue, state.currentNPCId, state.currentScriptId, relStore, resolveDialogueEventCompletion]);
 
   // Cancel dialogue (close button or walked away)
   const cancelDialogue = useCallback(() => {
@@ -395,6 +456,7 @@ export function useGameLoop() {
         }
         advanceNPCDialogue(state.currentNPCId);
       }
+      resolveDialogueEventCompletion(state.currentNPCId);
       setState(s => ({
         ...s,
         dialogueActive: false,
@@ -407,7 +469,7 @@ export function useGameLoop() {
 
     const line = state.currentDialogue.getCurrentLine();
     setState(s => ({ ...s, currentLine: line }));
-  }, [state.currentDialogue, state.currentNPCId, relStore]);
+  }, [state.currentDialogue, state.currentNPCId, relStore, resolveDialogueEventCompletion]);
 
   // Start an event
   const handleStartEvent = useCallback((event: GameEvent) => {
@@ -462,7 +524,7 @@ export function useGameLoop() {
         if (event.type === 'drama') {
           // Drama events use drama-specific dialogue scripts
           const relationship = relStore.getRelationship(npc.id);
-          const script = getDramaDialogueForNPC(npc.id, relationship, gameStore.day);
+          const script = getDramaDialogueForNPC(npc.id, relationship, gameStore.totalDaysPlayed);
           const runner = new DialogueRunner(script, {
             charm: bio.charm,
             energy: bio.energy,
@@ -481,16 +543,15 @@ export function useGameLoop() {
             currentLine: line,
             currentNPCId: npc.id,
             currentScriptId: script.id,
+            activeEventId: event.id,
           }));
         } else {
-          // Social/arrival events use regular NPC chat dialogues
+          // Social/arrival events: record which event was started so dialogue
+          // completion can mark exactly this event done (not a blind timeout)
+          setState(s => ({ ...s, activeEventId: event.id }));
           handleNPCInteract(npc.id);
         }
       }
-      setTimeout(() => {
-        gameStore.completeEvent();
-        setState(s => ({ ...s, currentEvent: null }));
-      }, 500);
     }
   }, [bio, gameStore, activeCast, handleNPCInteract, relStore, playerStore]);
 
@@ -509,13 +570,14 @@ export function useGameLoop() {
   // Challenge complete
   const handleChallengeComplete = useCallback((score: number, tier: string) => {
     const delta = getRelationshipReward(tier as 'bronze' | 'silver' | 'gold');
-    // Read challengeNPCId from current state before updating
     setState(s => {
-      // Schedule relationship update outside the setState updater
       if (s.challengeNPCId) {
         queueMicrotask(() => relStore.changeRelationship(s.challengeNPCId, delta));
       }
-      return { ...s, showChallengeUI: false, currentEvent: null };
+      const newCompleted = s.currentEvent
+        ? [...s.completedEventIds, s.currentEvent.id]
+        : s.completedEventIds;
+      return { ...s, showChallengeUI: false, currentEvent: null, completedEventIds: newCompleted };
     });
     if (tier === 'gold') playerStore.incrementChallengesWon();
     gameStore.completeEvent();
@@ -529,7 +591,12 @@ export function useGameLoop() {
     }
     playerStore.incrementDatesCompleted();
     gameStore.completeEvent();
-    setState(s => ({ ...s, showDateUI: false, currentEvent: null, dateNPCId: '', dateNPCName: '' }));
+    setState(s => {
+      const newCompleted = s.currentEvent
+        ? [...s.completedEventIds, s.currentEvent.id]
+        : s.completedEventIds;
+      return { ...s, showDateUI: false, currentEvent: null, dateNPCId: '', dateNPCName: '', completedEventIds: newCompleted };
+    });
   }, [state.dateNPCId, relStore, playerStore, gameStore]);
 
   // Spawn nightly drops — also assigned to triggerNightSpawnRef for dev toolbar
@@ -558,31 +625,62 @@ export function useGameLoop() {
   const continueSleep = useCallback(() => {
     setState(s => ({ ...s, showSleepTransition: false }));
 
+    // Reset daily stats: 80% energy, 30 charm, 30 performance
+    useBiometricStore.setState({ energy: 80, charm: 30, performance: 30 });
+
     // Reset daily state
     resetSeenDialogues();
     playerStore.clearDayBuffs();
 
-    // Check if it's ceremony day next
-    if (gameStore.day === 7) {
-      gameStore.setPhase('CEREMONY');
-      setState(s => ({ ...s, showCeremonyUI: true, ceremonyPhase: 'choosing' }));
+    const nextDay = gameStore.day + 1;
+    const currentWeek = gameStore.week;
+
+    // Check if tomorrow is ceremony day
+    if (isCeremonyDay(nextDay, currentWeek)) {
+      gameStore.advanceToCeremony(); // sets day to ceremony day, phase to CEREMONY
+
+      if (currentWeek === 1) {
+        // Week 1 FTUE ceremony: no elimination, just a message
+        setState(s => ({ ...s, showCeremonyUI: true, ceremonyPhase: 'ftue_complete' }));
+      } else {
+        // Week 2+: real ceremony with partner choosing + elimination
+        setState(s => ({ ...s, showCeremonyUI: true, ceremonyPhase: 'choosing' }));
+      }
       return;
+    }
+
+    // Add FTUE progressive arrivals for Week 1
+    let newArrivedNPCIds = state.arrivedNPCIds;
+    if (currentWeek === 1) {
+      const newArrivals = FTUE_ARRIVALS[nextDay] ?? [];
+      if (newArrivals.length > 0) {
+        newArrivedNPCIds = [...state.arrivedNPCIds, ...newArrivals];
+      }
     }
 
     gameStore.advanceDay();
     droppedItemsRef.current = [];
-    const events = generateDailyEvents(gameStore.day + 1, gameStore.week, activeCast, state.producerChoice);
+
+    // Build cast with updated arrivals for event generation
+    const updatedCast = STARTING_CAST.filter(c =>
+      !relStore.eliminated.includes(c.id) && newArrivedNPCIds.includes(c.id)
+    );
+
+    const events = generateDailyEvents(nextDay, currentWeek, updatedCast, state.producerChoice, newArrivedNPCIds);
     const briefingEvents = events.map(e => e.title);
     setState(s => ({
       ...s,
       showMorningBriefing: true,
       dailyEvents: events,
       briefingEvents,
-      producerChoice: null, // Clear after use
+      producerChoice: null,
+      completedEventIds: [],
+      activeEventId: null,
       droppedItems: [], // Clear leftover drops
       nightDropsOriginal: [],
+      arrivedNPCIds: newArrivedNPCIds,
     }));
-  }, [gameStore, activeCast, playerStore, state.producerChoice]);
+  }, [gameStore, playerStore, state.producerChoice, state.arrivedNPCIds, relStore]);
 
   // Ceremony - player chooses partner
   const handleCeremonyChoice = useCallback((npcId: string) => {
@@ -667,8 +765,41 @@ export function useGameLoop() {
     }));
   }, [activeCast, relStore]);
 
-  // Continue from ceremony — handles results -> departure -> demo_end
+  // Continue from ceremony — handles ftue_complete | results -> departure -> demo_end
   const continueCeremony = useCallback(() => {
+    // FTUE ceremony (Week 1): no elimination, advance to Week 2
+    if (state.ceremonyPhase === 'ftue_complete') {
+      resetSeenDialogues();
+      playerStore.clearDayBuffs();
+      useBiometricStore.setState({ energy: 80, charm: 30, performance: 30 });
+
+      gameStore.advanceDay(); // From ceremony day → wraps to Week 2, Day 1
+      droppedItemsRef.current = [];
+
+      // All NPCs now available for Week 2
+      const allNPCIds = STARTING_CAST.filter(c => c.id !== 'player').map(c => c.id);
+      const fullCast = STARTING_CAST.filter(c => c.id !== 'player');
+      const events = generateDailyEvents(1, 2, fullCast, null, allNPCIds);
+
+      setState(s => ({
+        ...s,
+        showCeremonyUI: false,
+        showMorningBriefing: true,
+        dailyEvents: events,
+        briefingEvents: events.map(e => e.title),
+        producerChoice: null,
+        completedEventIds: [],
+        activeEventId: null,
+        droppedItems: [],
+        nightDropsOriginal: [],
+        arrivedNPCIds: allNPCIds,
+        ceremonyPhase: 'choosing',
+        ceremonyResults: [],
+        eliminatedThisCeremony: [],
+      }));
+      return;
+    }
+
     // From results phase, go to departure screen if anyone was eliminated
     if (state.ceremonyPhase === 'results' && state.eliminatedThisCeremony.length > 0) {
       setState(s => ({ ...s, ceremonyPhase: 'departure' }));
@@ -681,30 +812,24 @@ export function useGameLoop() {
       return;
     }
 
-    // From demo end (or results with no eliminations), go back to main menu
+    // From demo_end (or results with no eliminations): reset and return to main menu
+    gameStore.resetGame();
+    relStore.resetRelationships();
     setState(s => ({
       ...s,
       showCeremonyUI: false,
+      showMainMenu: true,
       ceremonyPhase: 'choosing',
       ceremonyResults: [],
       eliminatedThisCeremony: [],
-      showMainMenu: true,
-    }));
-
-    resetSeenDialogues();
-    playerStore.clearDayBuffs();
-
-    gameStore.advanceDay();
-    const events = generateDailyEvents(1, gameStore.week + 1, activeCast, state.producerChoice);
-    setState(s => ({
-      ...s,
-      showMorningBriefing: true,
-      dailyEvents: events,
-      briefingEvents: events.map(e => e.title),
-      producerChoice: null,
+      dailyEvents: [],
+      completedEventIds: [],
+      activeEventId: null,
       droppedItems: [],
+      nightDropsOriginal: [],
+      arrivedNPCIds: [],
     }));
-  }, [gameStore, activeCast, playerStore, state.ceremonyPhase, state.eliminatedThisCeremony, state.producerChoice]);
+  }, [gameStore, relStore, playerStore, state.ceremonyPhase, state.eliminatedThisCeremony]);
 
   // Producer phone — store the choice so it's injected into next day's events
   const handleProducerPhone = useCallback((eventType: string) => {

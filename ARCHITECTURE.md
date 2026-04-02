@@ -65,13 +65,16 @@ src/
   characters/
     CharacterData.ts            -- All TypeScript types/interfaces (Character, GamePhase, EventType, etc.)
     roster.ts                   -- STARTING_CAST array (6 NPCs) + PLAYER_CHARACTER constant
-    dialogueScripts.ts          -- Hand-authored DialogueScript trees per NPC (keyed by relationship tier)
+    dialogueScripts.ts          -- Hand-authored DialogueScript trees per NPC (keyed by relationship tier) + daily dialogue progression logic
+    daily/                      -- Per-NPC daily dialogue scripts (126 total: 6 NPCs x 7 days x 3 tiers)
+      index.ts                  -- Barrel export: DAILY_DIALOGUES Record<string, DialogueScript[][]>
+      rosie.ts, blaze.ts, pudge.ts, kiki.ts, sprocket.ts, lily.ts
     personality.ts              -- Personality-related helpers
 
   systems/
     energy.ts                   -- canAfford(), spendEnergy(), getEnergyCostForAction(), getEnergyWarning()
-    calendar.ts                 -- getDayType(), isCeremonyDay(), getAvailableEventTypes(), getDayLabel()
-    events.ts                   -- generateDailyEvents(): builds EVENTS_PER_DAY GameEvent objects per day
+    calendar.ts                 -- getDayType(), isCeremonyDay(), isFreeRoamDay(), getAvailableEventTypes(), getDayLabel()
+    events.ts                   -- generateDailyEvents(): builds EVENTS_PER_DAY GameEvent objects per day (FTUE baked events for Week 1, normal generation for Week 2+)
     challenge.ts                -- Coconut Catch helpers: getCoconutFallSpeed(), getCatchRadius(), getScoreTier(), getRelationshipReward()
     relationships.ts            -- getRelationshipTier(), getRelationshipLabel(), calculateNPCChoice()
     biometrics.ts               -- Biometric computation helpers
@@ -86,7 +89,7 @@ src/
     EventScreen.tsx             -- Event preview (title, description, energy cost, start/close)
     ChallengeUI.tsx             -- Coconut Catch mini-game; displays random NPC partner banner during play and relationship delta on results screen
     DateUI.tsx                  -- Date sequence UI
-    CeremonyUI.tsx              -- Partner choosing + results + departure + demo end phases
+    CeremonyUI.tsx              -- Partner choosing + results + departure + demo end + ftue_complete phases
     StatBreakdown.tsx           -- Shared stat breakdown popup (used in MorningBriefing and HUD)
     SleepTransition.tsx         -- Night-to-morning fade
     ItemPopup.tsx               -- Generic popup (also used for "too tired" warning)
@@ -133,20 +136,24 @@ All 4 stores are created with `create<T>()` from Zustand v5. They are accessed i
 ```ts
 interface GameStore {
   phase: GamePhase;          // 'MAIN_MENU' | 'MORNING_BRIEFING' | 'DAYTIME_FREE' | 'EVENT' | 'NIGHTTIME_FREE' | 'SLEEP_TRANSITION' | 'CEREMONY' | 'CEREMONY_RESULT'
-  day: number;               // 1-7
+  day: number;               // 1-based within current week
   week: number;              // starts at 1
+  totalDaysPlayed: number;   // running counter across weeks (for dialogue progression)
   eventsRemaining: number;   // 0 to EVENTS_PER_DAY (3)
   eventsCompleted: number;
   isNight: boolean;
+  isIndoors: boolean;
   currentEventType: EventType | null;
 
   setPhase(phase: GamePhase): void;
   startEvent(type: EventType): void;      // sets phase='EVENT', stores type
-  completeEvent(): void;                  // decrements eventsRemaining; auto-transitions to NIGHTTIME_FREE when 0
+  completeEvent(): void;                  // decrements eventsRemaining; returns to DAYTIME_FREE
   transitionToNight(): void;              // phase='NIGHTTIME_FREE', isNight=true, eventsRemaining=0
-  advanceDay(): void;                     // increments day (wraps at 7 -> week+1), resets events, phase='MORNING_BRIEFING'
+  advanceDay(): void;                     // increments day (wraps at getDaysInWeek(week) -> week+1), resets events, phase='MORNING_BRIEFING'
   advanceToNight(): void;
-  advanceToCeremony(): void;
+  advanceToCeremony(): void;              // sets day to getDaysInWeek(week), phase='CEREMONY'
+  enterVilla(): void;
+  exitVilla(): void;
   resetWeek(): void;
   resetGame(): void;
 }
@@ -245,6 +252,7 @@ interface RelationshipStore {
 - Lerp factor: `CAMERA.LERP_FACTOR = 0.1`.
 - First frame snaps to position; subsequent frames lerp.
 - Reads `playerPositionRef.current` every frame (no React re-renders).
+- Scroll wheel adjusts `cameraAngleRef.current` by +/-5 (clamped 0-100). Middle mouse click resets to 50.
 
 ### Lighting (`DayNightCycle.tsx`)
 
@@ -436,7 +444,7 @@ interface DialogueNode {
     condition?: (vars: Record<string, number>) => boolean;   // charm-gating etc.
     lockMessage?: string;
     next: string;          // node id to jump to
-    effects?: Record<string, number>;   // variable deltas (e.g., { relationship: 8 })
+    effects?: Record<string, number>;   // variable deltas (e.g., { relationship_level: 8 })
   }[];
   next?: string;   // auto-advance node id (no choices)
 }
@@ -469,14 +477,14 @@ Choice conditions check `vars.charm >= N` (or other stats). If the condition fai
 ### Relationship change flow
 
 1. `handleNPCInteract` creates a `DialogueRunner` with initial vars including `relationship_level` = current relationship.
-2. Player selects choices; `selectChoice()` applies `effects` (e.g., `{ relationship: 8 }` adds 8 to the `relationship` variable *inside the runner*).
+2. Player selects choices; `selectChoice()` applies `effects` (e.g., `{ relationship_level: 8 }` adds 8 to the `relationship_level` variable *inside the runner*).
 3. On dialogue end (`handleDialogueChoice` or `handleDialogueAdvance`), the game loop reads the runner's `relationship_level` variable, computes the delta from the store's current value, and calls `relStore.changeRelationship(npcId, delta)`.
 
-Note: the effects key in dialogue scripts uses `relationship` (not `relationship_level`). The game loop reads `relationship_level` from the runner. This means dialogue effects must modify the `relationship_level` variable for changes to propagate. Currently the scripts use `{ relationship: N }` in effects -- this is a known inconsistency in the prototype where the effect key doesn't match the variable read by the game loop. In practice the relationship still changes because the `effects` add to `this.variables[key]`, and the existing scripts' key naming varies.
+The effects key in dialogue scripts uses `relationship_level` (matching the variable read by the game loop). The `DialogueRunner.selectChoice()` applies effects to `this.variables[key]`, so `{ relationship_level: 8 }` adds 8 to the runner's `relationship_level` variable. On dialogue end, the game loop computes the delta between the runner's `relationship_level` and the store's current value, then calls `relStore.changeRelationship(npcId, delta)`.
 
 ### Dialogue scripts (`src/characters/dialogueScripts.ts`)
 
-Hand-authored per NPC, keyed by relationship tier (e.g., `rosie_chat_low`, `rosie_chat_high`). `getDialogueForNPC(npcId, relationship)` selects the appropriate script. Also contains `DATE_DIALOGUES` for date events.
+Hand-authored per NPC, keyed by relationship tier (e.g., `rosie_chat_low`, `rosie_chat_high`). `getDialogueForNPC(npcId, relationship, gameDay)` selects the appropriate script -- first checking `DAILY_DIALOGUES` (per-day scripts in `src/characters/daily/`), falling back to base scripts. Also contains `DATE_DIALOGUES` for date events, `DRAMA_DIALOGUES` for drama events, and module-level NPC dialogue progress tracking (`npcDialogueProgress`, `advanceNPCDialogue`, `resetNPCDialogueProgress`).
 
 ---
 
@@ -496,6 +504,7 @@ interface GameLoopState {
   currentDialogue: DialogueRunner | null;
   currentLine: DialogueLine | null;
   currentNPCId: string | null;
+  currentScriptId: string | null;
   showEventScreen: boolean;
   showChallengeUI: boolean;
   showDateUI: boolean;
@@ -505,16 +514,21 @@ interface GameLoopState {
   showMainMenu: boolean;
   showProducerPhone: boolean;
   showItemPopup: boolean;
+  showInventory: boolean;
   itemPopupName: string;
   itemPopupDesc: string;
-  ceremonyPhase: 'choosing' | 'results';
+  ceremonyPhase: 'choosing' | 'results' | 'departure' | 'demo_end' | 'ftue_complete';
   ceremonyResults: { npcId: string; partnerId: string | null }[];
   eliminatedThisCeremony: string[];
   dateNPCId: string;
   dateNPCName: string;
   briefingEvents: string[];
-  droppedItems: DroppedItem[];    // items spawned in the 3D world
-  showInventory: boolean;         // inventory overlay visibility
+  droppedItems: DroppedItem[];         // items spawned in the 3D world
+  nightDropsOriginal: DroppedItem[];
+  producerChoice: EventType | null;    // producer phone choice for next day
+  completedEventIds: string[];         // ID-based event completion tracking
+  activeEventId: string | null;        // event started via button (completed on dialogue end)
+  arrivedNPCIds: string[];             // NPC arrival tracking (FTUE progressive arrivals)
 }
 ```
 
@@ -529,21 +543,25 @@ interface GameLoopState {
 
 ```
 MAIN_MENU
-  -> startGame() -> MORNING_BRIEFING (generates daily events)
+  -> startGame() -> MORNING_BRIEFING (generates daily events, initialises arrivedNPCIds)
      -> continueMorning() -> DAYTIME_FREE
         -> triggerEvent(i) -> shows EventScreen
            -> handleStartEvent(event) -> EVENT
-              challenge -> showChallengeUI -> handleChallengeComplete() -> DAYTIME_FREE (or NIGHTTIME_FREE if no events left)
-              date -> showDateUI -> handleDateComplete() -> DAYTIME_FREE (or NIGHTTIME_FREE)
-              social -> starts NPC dialogue -> completeEvent()
+              challenge -> showChallengeUI -> handleChallengeComplete() -> DAYTIME_FREE
+              date -> showDateUI -> handleDateComplete() -> DAYTIME_FREE
+              social/arrival -> starts NPC dialogue -> resolveDialogueEventCompletion() marks event done
+              drama -> starts drama dialogue -> resolveDialogueEventCompletion()
            -> closeEventScreen() -> dismisses popup without consuming event (player can re-open later)
-        -> goToSleep() -> SLEEP_TRANSITION
+        -> goToSleep() -> NIGHTTIME_FREE (spawns nightly drops)
      -> goToSleep() from NIGHTTIME_FREE -> SLEEP_TRANSITION
         -> continueSleep():
-           if day == 7 -> CEREMONY
-              -> handleCeremonyChoice(npcId) -> ceremonyPhase='results' (NPCs pick partners, eliminations happen)
-              -> continueCeremony() -> advanceDay() -> MORNING_BRIEFING (next week)
-           else -> advanceDay() -> MORNING_BRIEFING
+           if next day is ceremony:
+              Week 1 -> CEREMONY (ftue_complete, no elimination)
+                -> continueCeremony() -> advanceDay() -> MORNING_BRIEFING (Week 2, all NPCs)
+              Week 2+ -> CEREMONY (choosing)
+                -> handleCeremonyChoice(npcId) -> ceremonyPhase='results' -> 'departure' -> 'demo_end'
+                -> continueCeremony() -> resetGame() -> MAIN_MENU
+           else -> advanceDay() (+ add FTUE arrivals if Week 1) -> MORNING_BRIEFING
 ```
 
 When `completeEvent()` is called on the game store, it decrements `eventsRemaining`. If it reaches 0, the store auto-transitions to `NIGHTTIME_FREE` and sets `isNight = true`. Events are required -- the "Advance to Night" button only appears after all events are completed. Closing the event popup (via `closeEventScreen()`) merely dismisses it without consuming the event.
@@ -588,8 +606,10 @@ Defined in `PlayerController.tsx` and imported by other modules:
 
 ## 11. Key Constants (`src/game/constants.ts`)
 
-### Energy costs
+### Energy / prod mode
 ```ts
+PROD_ENERGY = false  // When true, all energy costs are bypassed (tester mode)
+
 ENERGY_COSTS = {
   CHALLENGE_EVENT: 25,
   DATE_EVENT: 20,
@@ -643,7 +663,7 @@ PLAYER = {
 ### Coconut Catch (challenge mini-game)
 ```ts
 COCONUT_CATCH = {
-  DURATION_SECONDS: 30,
+  DURATION_SECONDS: 10,
   BRONZE_THRESHOLD: 5,
   SILVER_THRESHOLD: 10,
   GOLD_THRESHOLD: 15,
@@ -666,8 +686,8 @@ RELATIONSHIP = {
   DATE_GOOD: 10,
   DATE_BAD: -5,
   CHALLENGE_GOLD: 15,
-  CHALLENGE_SILVER: 10,
-  CHALLENGE_BRONZE: 5,
+  CHALLENGE_SILVER: 8,
+  CHALLENGE_BRONZE: -10,
   NIGHT_CHAT_BONUS: 3,
 }
 ```
@@ -682,11 +702,22 @@ CEREMONY = {
 
 ### Schedule
 ```ts
-DAYS_PER_WEEK = 7
+getDaysInWeek(week: number): number  // Week 1 -> 4, Week 2+ -> 6
 EVENTS_PER_DAY = 3
-// MAX_INVENTORY removed -- inventory is now unlimited
+DAYS_PER_WEEK = 7  // deprecated, use getDaysInWeek(week)
 
-WEEKLY_SCHEDULE = ['arrival', 'free', 'challenge', 'date', 'drama', 'free', 'ceremony']
+WEEK1_SCHEDULE = ['arrival', 'arrival', 'free', 'ceremony']  // 4 days FTUE
+WEEK2_SCHEDULE = ['free', 'challenge', 'date', 'drama', 'free', 'ceremony']  // 6 days normal
+getWeekSchedule(week: number): DayType[]  // returns WEEK1_ or WEEK2_SCHEDULE
+
+// FTUE NPC arrival schedule (Week 1)
+FTUE_ARRIVALS: Record<number, string[]> = {
+  1: ['rosie', 'blaze', 'pudge'],
+  2: ['kiki', 'sprocket'],
+  3: ['lily'],
+}
+
+type DayType = 'arrival' | 'free' | 'challenge' | 'date' | 'drama' | 'ceremony'
 ```
 
 Relationship tiers (in `systems/relationships.ts`):

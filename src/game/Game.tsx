@@ -254,7 +254,7 @@ export default function Game() {
               <span className="ml-auto text-[10px] font-semibold text-white/50"
                 style={{ textShadow: '0 1px 4px rgba(0,0,0,0.6)' }}
               >
-                {state.dailyEvents.length - gameStore.eventsRemaining}/{state.dailyEvents.length}
+                {state.completedEventIds.length}/{state.dailyEvents.length}
               </span>
             </div>
 
@@ -269,8 +269,7 @@ export default function Game() {
 
             {/* Event buttons */}
             {state.dailyEvents.map((evt, i) => {
-              const completedCount = state.dailyEvents.length - gameStore.eventsRemaining;
-              const isCompleted = i < completedCount;
+              const isCompleted = state.completedEventIds.includes(evt.id);
               const icon = evt.type === 'challenge' ? '\u2694\uFE0F' : evt.type === 'date' ? '\u{1F495}' : '\u{1F389}';
 
               return (
@@ -343,7 +342,7 @@ export default function Game() {
               margin: '2px 0',
             }}>
               <div style={{
-                width: `${state.dailyEvents.length > 0 ? ((state.dailyEvents.length - gameStore.eventsRemaining) / state.dailyEvents.length) * 100 : 0}%`,
+                width: `${state.dailyEvents.length > 0 ? (state.completedEventIds.length / state.dailyEvents.length) * 100 : 0}%`,
                 height: '100%',
                 borderRadius: '2px',
                 background: gameStore.eventsRemaining <= 0
@@ -384,7 +383,7 @@ export default function Game() {
           </div>
         )}
 
-        {/* Night time - item checklist + go to sleep */}
+        {/* Night time - exploration prompt + go to sleep */}
         {gameStore.phase === 'NIGHTTIME_FREE' && !state.dialogueActive && (
           <div style={{
             pointerEvents: 'auto',
@@ -393,81 +392,30 @@ export default function Game() {
             right: '8px',
             display: 'flex',
             flexDirection: 'column',
-            gap: '3px',
-            width: '160px',
+            gap: '6px',
+            width: '175px',
             zIndex: 45,
           }}>
-            {/* Compact header with count */}
-            <div className="flex items-center gap-1 px-1"
-              style={{ textShadow: '0 1px 4px rgba(0,0,0,0.7)' }}
-            >
-              <span className="text-[10px]">{"\u2728"}</span>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-white/70">
-                Items
-              </span>
-              <span className="text-[10px] font-semibold text-white/50">
-                {state.nightDropsOriginal.length - state.droppedItems.length}/{state.nightDropsOriginal.length}
-              </span>
-              <span className="ml-auto text-[9px] italic text-white/40">
-                (optional)
-              </span>
+            {/* Night exploration text */}
+            <div style={{
+              padding: '10px 12px',
+              borderRadius: '12px',
+              background: 'rgba(0,0,0,0.5)',
+              border: '1px solid rgba(99,102,241,0.3)',
+              textAlign: 'center',
+            }}>
+              <p className="text-[11px] font-medium text-indigo-200/90"
+                style={{ textShadow: '0 1px 4px rgba(0,0,0,0.7)', lineHeight: '1.4' }}>
+                {"\u2728"} Search the island for treasures, and go to bed whenever you're ready!
+              </p>
             </div>
-
-            {/* Compact item rows */}
-            {state.nightDropsOriginal.map((drop, i) => {
-              const isPickedUp = !state.droppedItems.some(d => d.dropId === drop.dropId);
-              const ITEM_EMOJIS: Record<string, string> = {
-                flowers: '\u{1F490}',
-                chocolate: '\u{1F36B}',
-                book: '\u{1F4D6}',
-                sunglasses: '\u{1F576}\u{FE0F}',
-                producer_phone: '\u{1F4F1}',
-              };
-              const emoji = drop.item.id.startsWith('journal_')
-                ? '\u{1F4D3}'
-                : ITEM_EMOJIS[drop.item.id] ?? '\u{1F381}';
-
-              return (
-                <div
-                  key={`night-item-${i}`}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '5px',
-                    padding: '3px 8px',
-                    borderRadius: '8px',
-                    background: isPickedUp
-                      ? 'rgba(0,0,0,0.45)'
-                      : 'rgba(0,0,0,0.35)',
-                    fontSize: '11px',
-                    fontWeight: 600,
-                  }}
-                >
-                  <span style={{
-                    color: isPickedUp ? '#4ade80' : 'rgba(255,255,255,0.4)',
-                    fontSize: '10px',
-                    flexShrink: 0,
-                  }}>
-                    {isPickedUp ? '\u2713' : '\u25CB'}
-                  </span>
-                  <span style={{
-                    color: isPickedUp ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.85)',
-                    textDecoration: isPickedUp ? 'line-through' : 'none',
-                    lineHeight: '1.2',
-                  }}>
-                    {emoji} {drop.item.name}
-                  </span>
-                </div>
-              );
-            })}
 
             {/* Go to Sleep button */}
             <button
               onClick={goToSleep}
               className="game-button"
               style={{
-                marginTop: '2px',
-                padding: '8px 12px',
+                padding: '10px 12px',
                 borderRadius: '10px',
                 background: 'linear-gradient(135deg, #1e1b4b, #312e81)',
                 color: 'white',
@@ -582,6 +530,7 @@ export default function Game() {
               results={state.ceremonyResults}
               eliminated={state.eliminatedThisCeremony}
               onContinue={continueCeremony}
+              week={gameStore.week}
             />
           </div>
         )}
