@@ -22,9 +22,9 @@ interface BiometricStore extends BiometricData {
 export const useBiometricStore = create<BiometricStore>((set) => ({
   sleepHours: 7,
   sleepQuality: 70,
-  activeMinutes: 30,
-  stepCount: 5000,
-  ...computeStats(7, 70, 30, 5000),
+  activeMinutes: 18,
+  stepCount: 3000,
+  ...computeStats(7, 70, 18, 3000),
   godMode: false,
   setSleepHours: (v) => set((s) => {
     const stats = computeStats(v, s.sleepQuality, s.activeMinutes, s.stepCount);
@@ -44,6 +44,6 @@ export const useBiometricStore = create<BiometricStore>((set) => ({
   }),
   setGodMode: (on) => set(() => on
     ? { godMode: true, energy: 100, charm: 100, performance: 100 }
-    : { godMode: false, ...computeStats(7, 70, 30, 5000) }
+    : { godMode: false, ...computeStats(7, 70, 18, 3000) }
   ),
 }));
