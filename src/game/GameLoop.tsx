@@ -11,7 +11,8 @@ import { canAfford } from '@/systems/energy';
 import { calculateNPCChoice } from '@/systems/relationships';
 import { getDialogueForNPC, getDramaDialogueForNPC, markDialogueSeen, resetSeenDialogues, advanceNPCDialogue, resetNPCDialogueProgress } from '@/characters/dialogueScripts';
 import { DialogueRunner, DialogueLine } from '@/utils/ink';
-import { ENERGY_COSTS, PROD_ENERGY, FTUE_ARRIVALS, getDaysInWeek } from '@/game/constants';
+import { ENERGY_COSTS, PROD_ENERGY, FTUE_ARRIVALS, UNLOCKABLE_STRUCTURES, getDaysInWeek } from '@/game/constants';
+import { cameraPanTargetRef } from '@/scene/IsometricCamera';
 import { isCeremonyDay, isFreeRoamDay } from '@/systems/calendar';
 import { getStructureLockMessage } from '@/game/unlocks';
 import { EventType, GameEvent, ItemDef } from '@/characters/CharacterData';
@@ -77,6 +78,12 @@ export interface GameLoopState {
   completedEventIds: string[];
   // ID of the event that was started via the event button — completed when dialogue ends
   activeEventId: string | null;
+
+  // New arrivals / unlocks notification
+  showArrivalsPopup: boolean;
+  arrivalsNPCIds: string[];
+  arrivalsStructures: string[];
+  arrivalsPanning: boolean;
 }
 
 /** Module-level ref so DevToolbar can read active drops without prop drilling */
@@ -124,6 +131,10 @@ export function useGameLoop() {
     producerChoice: null,
     completedEventIds: [],
     activeEventId: null,
+    showArrivalsPopup: false,
+    arrivalsNPCIds: [],
+    arrivalsStructures: [],
+    arrivalsPanning: false,
   });
 
 
@@ -302,8 +313,33 @@ export function useGameLoop() {
 
   // Continue from morning briefing
   const continueMorning = useCallback(() => {
+    setState(s => {
+      const hasArrivals = s.arrivalsNPCIds.length > 0 || s.arrivalsStructures.length > 0;
+      if (hasArrivals) {
+        // Show arrivals popup now that morning briefing is dismissed
+        return { ...s, showMorningBriefing: false, showArrivalsPopup: true };
+      }
+      // Defer store update to avoid "setState during render" warning
+      queueMicrotask(() => gameStore.setPhase('DAYTIME_FREE'));
+      return { ...s, showMorningBriefing: false };
+    });
+  }, [gameStore]);
+
+  // Dismiss arrivals popup → begin camera panning
+  const dismissArrivalsPopup = useCallback(() => {
+    setState(s => ({ ...s, showArrivalsPopup: false, arrivalsPanning: true }));
+  }, []);
+
+  // Camera panning complete → enter free roam
+  const finishArrivalsPanning = useCallback(() => {
+    cameraPanTargetRef.current = null;
     gameStore.setPhase('DAYTIME_FREE');
-    setState(s => ({ ...s, showMorningBriefing: false }));
+    setState(s => ({
+      ...s,
+      arrivalsPanning: false,
+      arrivalsNPCIds: [],
+      arrivalsStructures: [],
+    }));
   }, [gameStore]);
 
   // NPC interaction - start dialogue
@@ -654,14 +690,22 @@ export function useGameLoop() {
     }
 
     // Add FTUE progressive arrivals for Week 1
+    const newNPCArrivals = (currentWeek === 1) ? (FTUE_ARRIVALS[nextDay] ?? []) : [];
     let newArrivedNPCIds = gameStore.arrivedNPCIds;
-    if (currentWeek === 1) {
-      const newArrivals = FTUE_ARRIVALS[nextDay] ?? [];
-      if (newArrivals.length > 0) {
-        newArrivedNPCIds = [...gameStore.arrivedNPCIds, ...newArrivals];
-        gameStore.addArrivedNPCs(newArrivals);
+    if (newNPCArrivals.length > 0) {
+      newArrivedNPCIds = [...gameStore.arrivedNPCIds, ...newNPCArrivals];
+      gameStore.addArrivedNPCs(newNPCArrivals);
+    }
+
+    // Detect structures unlocking today
+    const newStructures: string[] = [];
+    for (const [key, struct] of Object.entries(UNLOCKABLE_STRUCTURES)) {
+      if (struct.week === currentWeek && struct.day === nextDay) {
+        newStructures.push(key);
       }
     }
+
+    const hasArrivals = newNPCArrivals.length > 0 || newStructures.length > 0;
 
     gameStore.advanceDay();
     droppedItemsRef.current = [];
@@ -681,8 +725,12 @@ export function useGameLoop() {
       producerChoice: null,
       completedEventIds: [],
       activeEventId: null,
-      droppedItems: [], // Clear leftover drops
+      droppedItems: [],
       nightDropsOriginal: [],
+      showArrivalsPopup: false,  // shown after morning briefing + producer are dismissed
+      arrivalsNPCIds: newNPCArrivals,
+      arrivalsStructures: newStructures,
+      arrivalsPanning: false,
     }));
   }, [gameStore, playerStore, state.producerChoice, relStore]);
 
@@ -889,6 +937,8 @@ export function useGameLoop() {
     activeCast,
     startGame,
     continueMorning,
+    dismissArrivalsPopup,
+    finishArrivalsPanning,
     handleNPCInteract,
     cancelDialogue,
     handleDialogueChoice,

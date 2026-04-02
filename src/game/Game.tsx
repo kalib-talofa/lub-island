@@ -23,6 +23,8 @@ import ItemPopup from '@/ui/ItemPopup';
 import ProducerPhone from '@/ui/ProducerPhone';
 import InventoryUI from '@/ui/InventoryUI';
 import StatBreakdown from '@/ui/StatBreakdown';
+import ArrivalsPopup from '@/ui/ArrivalsPopup';
+import ArrivalsPanner from '@/ui/ArrivalsPanner';
 import { canAfford } from '@/systems/energy';
 import { audioManager } from '@/utils/audio';
 import { cameraAngleRef } from '@/scene/IsometricCamera';
@@ -41,6 +43,8 @@ export default function Game() {
     activeCast,
     startGame,
     continueMorning,
+    dismissArrivalsPopup,
+    finishArrivalsPanning,
     handleNPCInteract,
     cancelDialogue,
     handleDialogueChoice,
@@ -480,6 +484,26 @@ export default function Game() {
               stepCount={bio.stepCount}
             />
           </div>
+        )}
+
+        {/* New Arrivals Popup */}
+        {state.showArrivalsPopup && (
+          <div style={{ pointerEvents: 'auto' }}>
+            <ArrivalsPopup
+              npcIds={state.arrivalsNPCIds}
+              structures={state.arrivalsStructures}
+              onDismiss={dismissArrivalsPopup}
+            />
+          </div>
+        )}
+
+        {/* Arrivals Camera Panning */}
+        {state.arrivalsPanning && (
+          <ArrivalsPanner
+            npcIds={state.arrivalsNPCIds}
+            structures={state.arrivalsStructures}
+            onComplete={finishArrivalsPanning}
+          />
         )}
 
         {/* Event Screen */}

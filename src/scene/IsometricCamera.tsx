@@ -19,6 +19,9 @@ export const cameraAngleRef = { current: 50 };
 /** Dev sky mode — when true, camera zooms out to show the full map */
 export const devSkyModeRef = { current: false };
 
+/** When non-null, camera temporarily pans to this world position instead of following the player. */
+export const cameraPanTargetRef: { current: THREE.Vector3 | null } = { current: null };
+
 // Presets at the three key points of the slider
 const LOW_OFFSET = new THREE.Vector3(15, 8, 15);   // slider = 0
 const MID_OFFSET = new THREE.Vector3(20, 20, 20);  // slider = 50
@@ -125,14 +128,16 @@ export default function IsometricCamera() {
 
     // Dev sky mode: override target, position, and zoom
     const isSky = devSkyModeRef.current;
-    const desiredTarget = isSky ? SKY_TARGET : playerPos;
+    const panTarget = cameraPanTargetRef.current;
+    const lookAt = isSky ? SKY_TARGET : (panTarget ?? playerPos);
+    const desiredTarget = lookAt;
     const desiredPosition = isSky
       ? _v.copy(SKY_TARGET).add(SKY_OFFSET)
-      : _v.copy(playerPos).add(offset);
+      : _v.copy(lookAt).add(offset);
     const desiredZoom = isSky ? SKY_ZOOM : zoom;
 
-    // Smooth lerp (faster when transitioning to/from sky mode)
-    const lerpSpeed = isSky ? 0.35 : CAMERA.LERP_FACTOR;
+    // Smooth lerp (faster for sky mode and camera pans)
+    const lerpSpeed = isSky ? 0.35 : panTarget ? 0.12 : CAMERA.LERP_FACTOR;
     smoothTarget.current.lerp(desiredTarget, lerpSpeed);
     smoothPosition.current.lerp(desiredPosition, lerpSpeed);
     smoothZoom.current += (desiredZoom - smoothZoom.current) * lerpSpeed;
