@@ -3,7 +3,7 @@
 // ---------------------------------------------------------------------------
 // Set to true before sending to testers: hides dev tools, disables energy
 // costs so players are never blocked by low energy stats.
-export const PROD_ENERGY = true;
+export const PROD_ENERGY = false;
 
 // Energy costs
 export const ENERGY_COSTS = {
