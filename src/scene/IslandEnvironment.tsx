@@ -4,6 +4,8 @@ import { useRef, useMemo, Suspense } from "react";
 import * as THREE from "three";
 import { useFrame } from "@react-three/fiber";
 import { Instance, Instances, useTexture, useGLTF } from "@react-three/drei";
+import { useGameStore } from "@/store/gameStore";
+import { isZoneUnlocked, isStructureUnlocked } from "@/game/unlocks";
 
 useGLTF.preload("/models/Environment/TropicalTree.glb");
 useGLTF.preload("/models/Environment/EvergreenTree.glb");
@@ -27,11 +29,12 @@ function useConfiguredTexture(path: string, repeat: [number, number]): THREE.Tex
 export const ZONE_POSITIONS: Record<string, [number, number, number]> = {
   beach: [0, 0, 16],
   villa: [0, 0.1, 0],
-  garden: [14, 0, 2],
-  arena: [-14, 0, 2],
-  jungle: [0, 0, -14],
+  garden: [28, 0, 0],       // east land plot (unlocked by Rosie)
+  arena: [-28, 0, 0],       // west land plot (unlocked by Blaze)
+  jungle: [0, 0, -30],      // north land plot (unlocked by Lily)
   dock: [12, 0, 16],
-  lookout: [12, 1.5, -12],
+  lookout: [14, 1.5, -22],  // northeast land plot (unlocked by Kiki)
+  cave: [-17.5, 0, -2.1],   // west side base island
 };
 
 // ---------------------------------------------------------------------------
@@ -70,6 +73,54 @@ function Rock({ position, scale = 1 }: { position: [number, number, number]; sca
       <dodecahedronGeometry args={[0.5, 0]} />
       <meshStandardMaterial color="#808080" roughness={0.95} flatShading />
     </mesh>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Land plot ground — large grass ellipse beneath each NPC-unlocked zone
+// ---------------------------------------------------------------------------
+
+/**
+ * Blob descriptor: [offsetX, offsetZ, scaleX, scaleZ]
+ * Positioned relative to the parent group (the zone).
+ */
+type BlobDef = [number, number, number, number];
+
+interface LandPlotProps {
+  isNight: boolean;
+  semiX: number;
+  semiZ: number;
+  /** Extra ground blobs that create organic coastline + bridges to main island */
+  blobs?: BlobDef[];
+}
+
+function LandPlot({ isNight, semiX, semiZ, blobs }: LandPlotProps) {
+  const groundColor = isNight ? "#1E5C1E" : "#3CB043";
+  const baseTex = useTexture("/textures/Grass.png");
+  const texture = useMemo(() => {
+    const t = baseTex.clone();
+    t.colorSpace = THREE.SRGBColorSpace;
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.repeat.set(Math.round(semiX * 0.8), Math.round(semiZ * 0.8));
+    t.needsUpdate = true;
+    return t;
+  }, [baseTex, semiX, semiZ]);
+
+  return (
+    <group>
+      {/* Main plot ellipse */}
+      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.005, 0]} scale={[semiX, semiZ, 1]}>
+        <circleGeometry args={[1, 32]} />
+        <meshStandardMaterial color={groundColor} map={texture} roughness={0.95} />
+      </mesh>
+      {/* Organic edge & bridge blobs */}
+      {blobs?.map((b, i) => (
+        <mesh key={`blob-${i}`} receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[b[0], -0.004, b[1]]} scale={[b[2], b[3], 1]}>
+          <circleGeometry args={[1, 20]} />
+          <meshStandardMaterial color={groundColor} map={texture} roughness={0.95} polygonOffset polygonOffsetFactor={-1} polygonOffsetUnits={-1} />
+        </mesh>
+      ))}
+    </group>
   );
 }
 
@@ -250,7 +301,26 @@ function Garden({ isNight }: { isNight: boolean }) {
   const benchTexture = useConfiguredTexture("/textures/WoodPanelLong.png", [2, 1]);
   return (
     <group position={[ZONE_POSITIONS.garden[0], ZONE_POSITIONS.garden[1], ZONE_POSITIONS.garden[2]]}>
-      {/* Grassy patch — darker tint, raised above base grass extensions */}
+      {/* Land plot ground */}
+      <LandPlot isNight={isNight} semiX={12} semiZ={10} blobs={[
+        // Bridge blobs toward main island (west, negative X)
+        [-14, -1, 5, 4],
+        [-17, 0, 4, 3.5],
+        [-20, 1, 4, 3],
+        // Outer edge scatter (east / north / south)
+        [10, -7, 4, 3],
+        [8, 8, 3.5, 2.5],
+        [11, 3, 3, 3],
+        [-4, -9, 3, 2.5],
+        [-2, 9, 3.5, 2],
+        [5, -10, 2.5, 2],
+      ]} />
+      {/* Edge trees */}
+      <SimpleTree position={[-9, 0, -6]} />
+      <SimpleTree position={[9, 0, 5]} />
+      <PalmTree position={[-7, 0, 7]} scale={4.5} />
+      <PalmTree position={[8, 0, -7]} scale={5.0} />
+      {/* Grassy patch — darker tint, garden area within the plot */}
       <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.03, 0]}>
         <circleGeometry args={[6, 24]} />
         <meshStandardMaterial color={isNight ? "#1A4A1A" : "#236B23"} map={grassTexture} roughness={1} polygonOffset polygonOffsetFactor={-6} polygonOffsetUnits={-6} />
@@ -334,6 +404,25 @@ function ChallengeArena({ isNight }: { isNight: boolean }) {
   const gravelTexture = useConfiguredTexture("/textures/GravelRock.png", [5, 5]);
   return (
     <group position={[ZONE_POSITIONS.arena[0], ZONE_POSITIONS.arena[1], ZONE_POSITIONS.arena[2]]}>
+      {/* Land plot ground */}
+      <LandPlot isNight={isNight} semiX={12} semiZ={10} blobs={[
+        // Bridge blobs toward main island (east, positive X)
+        [14, 1, 5, 4],
+        [17, -1, 4, 3.5],
+        [20, 0, 4, 3],
+        // Outer edge scatter
+        [-10, 6, 4, 3],
+        [-8, -7, 3.5, 2.5],
+        [-11, -2, 3, 3],
+        [3, 9, 3, 2.5],
+        [4, -9, 3.5, 2],
+        [-5, 9, 2.5, 2],
+      ]} />
+      {/* Edge decorations */}
+      <PalmTree position={[-9, 0, 6]} scale={4.0} />
+      <PalmTree position={[8, 0, -5]} scale={4.5} />
+      <Rock position={[-8, 0.2, -6]} scale={1.2} />
+      <Rock position={[9, 0.15, 5]} scale={0.8} />
       {/* Arena floor — raised above base grass extensions */}
       <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.03, 0]}>
         <circleGeometry args={[7, 32]} />
@@ -390,6 +479,32 @@ function JungleTrail({ isNight }: { isNight: boolean }) {
 
   return (
     <group position={[ZONE_POSITIONS.jungle[0], ZONE_POSITIONS.jungle[1], ZONE_POSITIONS.jungle[2]]}>
+      {/* Land plot ground */}
+      <LandPlot isNight={isNight} semiX={10} semiZ={14} blobs={[
+        // Bridge blobs toward main island (south, positive Z)
+        [1, 16, 4, 5],
+        [-1, 19, 3.5, 4],
+        [0, 22, 3, 3.5],
+        // Outer edge scatter (north / east / west)
+        [-8, -10, 3, 3.5],
+        [7, -11, 3.5, 3],
+        [-9, 3, 3, 2.5],
+        [8, -4, 2.5, 3],
+        [0, -13, 3, 2.5],
+        [-6, 10, 2.5, 2],
+        [6, 8, 2.5, 2.5],
+      ]} />
+      {/* Lily's pond */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[5, 0.02, 5]}>
+        <circleGeometry args={[2.5, 16]} />
+        <meshStandardMaterial color={isNight ? "#2A4A6A" : "#4488CC"} transparent opacity={0.6} roughness={0.2} />
+      </mesh>
+      {/* Extra edge trees */}
+      <PalmTree position={[-7, 0, 8]} scale={5.5} />
+      <PalmTree position={[7, 0, 9]} scale={4.5} />
+      <SimpleTree position={[-6, 0, -10]} />
+      <SimpleTree position={[5, 0, -11]} />
+      <SimpleTree position={[0, 0, 10]} />
       {/* Path - winding brown path */}
       {[
         [-6, 0.03, 1], [-3, 0.03, 0], [0, 0.03, 1.2],
@@ -421,8 +536,9 @@ function JungleTrail({ isNight }: { isNight: boolean }) {
   );
 }
 
-function Dock({ isNight }: { isNight: boolean }) {
+function Dock({ isNight, locked = false }: { isNight: boolean; locked?: boolean }) {
   const woodColor = isNight ? "#6B5030" : "#9B7653";
+  const boardColor = isNight ? "#5a4530" : "#8B6914";
   const plankTexture = useConfiguredTexture("/textures/WoodPanelLong.png", [1, 1]);
   const railTexture = useConfiguredTexture("/textures/WoodPanelSimple.png", [1, 1]);
   return (
@@ -478,6 +594,35 @@ function Dock({ isNight }: { isNight: boolean }) {
         <cylinderGeometry args={[0.15, 0.2, 0.8, 6]} />
         <meshStandardMaterial color="#5C3A1E" roughness={0.9} />
       </mesh>
+
+      {/* Construction barrier when locked */}
+      {locked && (
+        <group position={[0, 0, -0.3]}>
+          {/* Barrier beams */}
+          <mesh position={[0, 0.8, 0]}>
+            <boxGeometry args={[2.4, 0.15, 0.1]} />
+            <meshStandardMaterial color="#FFD700" roughness={0.7} />
+          </mesh>
+          <mesh position={[0, 0.5, 0]}>
+            <boxGeometry args={[2.4, 0.15, 0.1]} />
+            <meshStandardMaterial color="#FFD700" roughness={0.7} />
+          </mesh>
+          {/* Barrier posts */}
+          <mesh position={[-1.1, 0.5, 0]}>
+            <cylinderGeometry args={[0.06, 0.06, 1.0, 4]} />
+            <meshStandardMaterial color={boardColor} roughness={0.8} />
+          </mesh>
+          <mesh position={[1.1, 0.5, 0]}>
+            <cylinderGeometry args={[0.06, 0.06, 1.0, 4]} />
+            <meshStandardMaterial color={boardColor} roughness={0.8} />
+          </mesh>
+          {/* "UNDER CONSTRUCTION" sign */}
+          <mesh position={[0, 1.1, 0.06]}>
+            <boxGeometry args={[1.4, 0.35, 0.04]} />
+            <meshStandardMaterial color="#FFD700" emissive="#FFD700" emissiveIntensity={0.3} roughness={0.7} />
+          </mesh>
+        </group>
+      )}
     </group>
   );
 }
@@ -487,6 +632,28 @@ function LookoutPoint({ isNight }: { isNight: boolean }) {
   const platformTexture = useConfiguredTexture("/textures/WoodPanelSimple.png", [2, 2]);
   return (
     <group position={[ZONE_POSITIONS.lookout[0], ZONE_POSITIONS.lookout[1], ZONE_POSITIONS.lookout[2]]}>
+      {/* Land plot ground (offset down by Y to compensate for elevated zone position) */}
+      <group position={[0, -1.5, 0]}>
+        <LandPlot isNight={isNight} semiX={10} semiZ={10} blobs={[
+          // Bridge blobs toward main island (south-west)
+          [-6, 10, 4, 4.5],
+          [-9, 13, 3.5, 4],
+          [-11, 16, 3, 3.5],
+          // Outer edge scatter
+          [8, -6, 3, 3],
+          [-7, -7, 3.5, 2.5],
+          [7, 5, 2.5, 3],
+          [-8, 3, 2.5, 2.5],
+          [4, -9, 2.5, 2],
+          [9, -1, 2, 2.5],
+        ]} />
+      </group>
+      {/* Edge decorations */}
+      <SimpleTree position={[-7, -1.5, -5]} />
+      <SimpleTree position={[6, -1.5, 5]} />
+      <Rock position={[-5, -1.3, 6]} scale={0.9} />
+      <Rock position={[7, -1.3, -6]} scale={0.7} />
+      <PalmTree position={[8, -1.5, 3]} scale={4.0} />
       {/* Elevated mound */}
       <mesh position={[0, -0.2, 0]} scale={[3, 1.5, 3]}>
         <sphereGeometry args={[1.2, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2]} />
@@ -529,6 +696,65 @@ function LookoutPoint({ isNight }: { isNight: boolean }) {
           <meshStandardMaterial color="#333333" roughness={0.4} />
         </mesh>
       </group>
+    </group>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Cave Exterior
+// ---------------------------------------------------------------------------
+
+function CaveExterior({ isNight, locked }: { isNight: boolean; locked: boolean }) {
+  const rockColor = isNight ? '#4a4540' : '#706860';
+  const boardColor = isNight ? '#5a4530' : '#8B6914';
+
+  return (
+    <group position={[ZONE_POSITIONS.cave[0], ZONE_POSITIONS.cave[1], ZONE_POSITIONS.cave[2]]}>
+      {/* Rocky cliff face */}
+      <mesh position={[0, 1.5, 0]} castShadow>
+        <boxGeometry args={[4, 3, 3]} />
+        <meshStandardMaterial color={rockColor} roughness={0.95} flatShading />
+      </mesh>
+      {/* Rock formation top */}
+      <mesh position={[0, 3.2, 0]} castShadow>
+        <dodecahedronGeometry args={[1.8, 0]} />
+        <meshStandardMaterial color={rockColor} roughness={0.95} flatShading />
+      </mesh>
+      {/* Side rocks */}
+      <mesh position={[-2.5, 0.8, 0.5]} castShadow>
+        <dodecahedronGeometry args={[1.2, 0]} />
+        <meshStandardMaterial color={rockColor} roughness={0.95} flatShading />
+      </mesh>
+      <mesh position={[2.5, 0.8, -0.5]} castShadow>
+        <dodecahedronGeometry args={[1.0, 0]} />
+        <meshStandardMaterial color={rockColor} roughness={0.95} flatShading />
+      </mesh>
+
+      {/* Cave entrance (dark hole) - visible when unlocked */}
+      {!locked && (
+        <mesh position={[0, 1.0, 1.51]}>
+          <planeGeometry args={[1.6, 2.0]} />
+          <meshStandardMaterial color="#1a1a1a" roughness={1} />
+        </mesh>
+      )}
+
+      {/* Construction boards when locked */}
+      {locked && (
+        <group position={[0, 1.0, 1.52]}>
+          {/* Horizontal boards */}
+          {[0, 0.5, 1.0, -0.5].map((y, i) => (
+            <mesh key={`board-${i}`} position={[0, y, 0]}>
+              <boxGeometry args={[1.8, 0.2, 0.08]} />
+              <meshStandardMaterial color={boardColor} roughness={0.9} />
+            </mesh>
+          ))}
+          {/* "UNDER CONSTRUCTION" sign */}
+          <mesh position={[0, 1.5, 0.05]}>
+            <boxGeometry args={[1.4, 0.4, 0.04]} />
+            <meshStandardMaterial color="#FFD700" emissive="#FFD700" emissiveIntensity={0.3} roughness={0.7} />
+          </mesh>
+        </group>
+      )}
     </group>
   );
 }
@@ -742,6 +968,22 @@ function IslandGround({ isNight }: { isNight: boolean }) {
         <circleGeometry args={[1, 28]} />
         <meshStandardMaterial color={groundColor} map={grassTexture} roughness={0.95} polygonOffset polygonOffsetFactor={-4} polygonOffsetUnits={-4} />
       </mesh>
+      {/* Organic edge bumps around main island perimeter */}
+      {([
+        [17, 6, 4, 3],
+        [-16, 8, 3.5, 3],
+        [14, -12, 3.5, 3],
+        [-15, -10, 3, 3.5],
+        [-18, 3, 3, 2.5],
+        [5, -18, 3.5, 2.5],
+        [-6, -17, 3, 3],
+        [18, -3, 2.5, 3],
+      ] as [number, number, number, number][]).map((b, i) => (
+        <mesh key={`edge-${i}`} receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[b[0], 0.003, b[1]]} scale={[b[2], b[3], 1]}>
+          <circleGeometry args={[1, 18]} />
+          <meshStandardMaterial color={groundColor} map={grassTexture} roughness={0.95} polygonOffset polygonOffsetFactor={-1} polygonOffsetUnits={-1} />
+        </mesh>
+      ))}
     </group>
   );
 }
@@ -755,6 +997,17 @@ interface IslandEnvironmentProps {
 }
 
 export default function IslandEnvironment({ isNight }: IslandEnvironmentProps) {
+  const arrivedNPCIds = useGameStore(s => s.arrivedNPCIds);
+  const week = useGameStore(s => s.week);
+  const day = useGameStore(s => s.day);
+
+  const gardenUnlocked = isZoneUnlocked('garden', arrivedNPCIds);
+  const arenaUnlocked = isZoneUnlocked('arena', arrivedNPCIds);
+  const jungleUnlocked = isZoneUnlocked('jungle', arrivedNPCIds);
+  const lookoutUnlocked = isZoneUnlocked('lookout', arrivedNPCIds);
+  const dockLocked = !isStructureUnlocked('dock', week, day);
+  const caveLocked = !isStructureUnlocked('cave', week, day);
+
   return (
     <group>
       {/* Water (large plane under everything) */}
@@ -765,13 +1018,17 @@ export default function IslandEnvironment({ isNight }: IslandEnvironmentProps) {
       {/* Textured zones — Suspense handles texture loading; scene appears once all are ready */}
       <Suspense fallback={null}>
         <IslandGround isNight={isNight} />
+        {/* Base zones — always visible */}
         <Beach isNight={isNight} />
         <Villa isNight={isNight} />
-        <Garden isNight={isNight} />
-        <ChallengeArena isNight={isNight} />
-        <Dock isNight={isNight} />
-        <LookoutPoint isNight={isNight} />
-        <JungleTrail isNight={isNight} />
+        {/* NPC-arrival zones — conditionally rendered */}
+        {gardenUnlocked && <Garden isNight={isNight} />}
+        {arenaUnlocked && <ChallengeArena isNight={isNight} />}
+        {lookoutUnlocked && <LookoutPoint isNight={isNight} />}
+        {jungleUnlocked && <JungleTrail isNight={isNight} />}
+        {/* Lockable structures — always rendered, visual state changes */}
+        <Dock isNight={isNight} locked={dockLocked} />
+        <CaveExterior isNight={isNight} locked={caveLocked} />
 
         {/* Extra palm trees scattered around the island */}
         <PalmTree position={[-10, 0, 12]} scale={5.0} />

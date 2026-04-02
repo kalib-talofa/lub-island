@@ -7,6 +7,7 @@ import { Text } from "@react-three/drei";
 import { STARTING_CAST } from "@/characters/roster";
 import { ZONE_POSITIONS } from "@/scene/IslandEnvironment";
 import { useRelationshipStore } from "@/store/relationshipStore";
+import { useGameStore } from "@/store/gameStore";
 import { playerPositionRef } from "@/scene/PlayerController";
 import { PLAYER } from "@/game/constants";
 import type { AnimalSpecies } from "@/characters/CharacterData";
@@ -388,12 +389,15 @@ interface NPCControllerProps {
 
 export default function NPCController({ isNight, onNPCInteract }: NPCControllerProps) {
   const eliminated = useRelationshipStore((s) => s.eliminated);
+  const arrivedNPCIds = useGameStore((s) => s.arrivedNPCIds);
 
-  // Compute NPC placements, filtering eliminated and applying night logic
+  // Compute NPC placements, filtering eliminated/unarrived and applying night logic
   const npcPlacements = useMemo(() => {
     const beachPos = ZONE_POSITIONS["beach"] ?? [0, 0, 16];
 
-    return STARTING_CAST.filter((c) => !eliminated.includes(c.id)).map((character) => {
+    return STARTING_CAST
+      .filter((c) => !eliminated.includes(c.id) && arrivedNPCIds.includes(c.id))
+      .map((character) => {
       const dayPos = getZonePosition(character.preferredZone, character.id);
       let finalPos: [number, number, number] = dayPos;
       let visible = true;
@@ -438,7 +442,7 @@ export default function NPCController({ isNight, onNPCInteract }: NPCControllerP
         visible,
       };
     });
-  }, [isNight, eliminated]);
+  }, [isNight, eliminated, arrivedNPCIds]);
 
   // Keep the module-level positions ref in sync
   useMemo(() => {

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { GamePhase, EventType } from '@/characters/CharacterData';
-import { getDaysInWeek, EVENTS_PER_DAY } from '@/game/constants';
+import { getDaysInWeek, EVENTS_PER_DAY, isRainyDay } from '@/game/constants';
 import { isCeremonyDay, isFreeRoamDay } from '@/systems/calendar';
 
 interface GameStore {
@@ -11,10 +11,14 @@ interface GameStore {
   eventsRemaining: number;  // 0-3
   eventsCompleted: number;
   isNight: boolean;
+  isRainy: boolean;
   isIndoors: boolean;
+  indoorLocation: 'villa' | 'cave' | null;
+  arrivedNPCIds: string[];
   currentEventType: EventType | null;
 
   setPhase: (phase: GamePhase) => void;
+  setRainy: (v: boolean) => void;
   startEvent: (type: EventType) => void;
   completeEvent: () => void;
   transitionToNight: () => void;
@@ -23,6 +27,10 @@ interface GameStore {
   advanceToCeremony: () => void;
   enterVilla: () => void;
   exitVilla: () => void;
+  enterCave: () => void;
+  exitCave: () => void;
+  setArrivedNPCIds: (ids: string[]) => void;
+  addArrivedNPCs: (ids: string[]) => void;
   resetWeek: () => void;
   resetGame: () => void;
 }
@@ -35,10 +43,14 @@ export const useGameStore = create<GameStore>((set) => ({
   eventsRemaining: EVENTS_PER_DAY,
   eventsCompleted: 0,
   isNight: false,
+  isRainy: false,
   isIndoors: false,
+  indoorLocation: null,
+  arrivedNPCIds: [],
   currentEventType: null,
 
   setPhase: (phase) => set({ phase }),
+  setRainy: (v) => set({ isRainy: v }),
 
   startEvent: (type) => set({ phase: 'EVENT', currentEventType: type }),
 
@@ -64,7 +76,7 @@ export const useGameStore = create<GameStore>((set) => ({
       return {
         day: 1, week: newWeek, totalDaysPlayed: newTotal,
         eventsRemaining: events, eventsCompleted: 0,
-        isNight: false, phase: 'MORNING_BRIEFING', currentEventType: null,
+        isNight: false, isRainy: isRainyDay(newWeek, 1), phase: 'MORNING_BRIEFING', currentEventType: null,
       };
     }
 
@@ -74,7 +86,7 @@ export const useGameStore = create<GameStore>((set) => ({
     return {
       day: newDay, totalDaysPlayed: newTotal,
       eventsRemaining: events, eventsCompleted: 0,
-      isNight: false, phase: 'MORNING_BRIEFING', currentEventType: null,
+      isNight: false, isRainy: isRainyDay(s.week, newDay), phase: 'MORNING_BRIEFING', currentEventType: null,
     };
   }),
 
@@ -84,18 +96,26 @@ export const useGameStore = create<GameStore>((set) => ({
     phase: 'CEREMONY', day: getDaysInWeek(s.week), currentEventType: null,
   })),
 
-  enterVilla: () => set({ isIndoors: true }),
-  exitVilla: () => set({ isIndoors: false }),
+  enterVilla: () => set({ isIndoors: true, indoorLocation: 'villa' }),
+  exitVilla: () => set({ isIndoors: false, indoorLocation: null }),
+  enterCave: () => set({ isIndoors: true, indoorLocation: 'cave' }),
+  exitCave: () => set({ isIndoors: false, indoorLocation: null }),
+  setArrivedNPCIds: (ids) => set({ arrivedNPCIds: ids }),
+  addArrivedNPCs: (ids) => set((s) => ({
+    arrivedNPCIds: [...s.arrivedNPCIds, ...ids.filter(id => !s.arrivedNPCIds.includes(id))],
+  })),
 
   resetWeek: () => set({
     day: 1, week: 1, totalDaysPlayed: 1,
     eventsRemaining: EVENTS_PER_DAY, eventsCompleted: 0,
-    isNight: false, isIndoors: false, phase: 'MORNING_BRIEFING', currentEventType: null,
+    isNight: false, isRainy: false, isIndoors: false, indoorLocation: null, arrivedNPCIds: [],
+    phase: 'MORNING_BRIEFING', currentEventType: null,
   }),
 
   resetGame: () => set({
     phase: 'MAIN_MENU', day: 1, week: 1, totalDaysPlayed: 1,
     eventsRemaining: EVENTS_PER_DAY, eventsCompleted: 0,
-    isNight: false, isIndoors: false, currentEventType: null,
+    isNight: false, isRainy: false, isIndoors: false, indoorLocation: null, arrivedNPCIds: [],
+    currentEventType: null,
   }),
 }));

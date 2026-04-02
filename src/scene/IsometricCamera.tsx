@@ -16,6 +16,9 @@ import { playerPositionRef } from "@/scene/PlayerController";
 /** Shared ref — writable from DevToolbar, pinch gestures, etc. */
 export const cameraAngleRef = { current: 50 };
 
+/** Dev sky mode — when true, camera zooms out to show the full map */
+export const devSkyModeRef = { current: false };
+
 // Presets at the three key points of the slider
 const LOW_OFFSET = new THREE.Vector3(15, 8, 15);   // slider = 0
 const MID_OFFSET = new THREE.Vector3(20, 20, 20);  // slider = 50
@@ -24,6 +27,11 @@ const HIGH_OFFSET = new THREE.Vector3(25, 35, 25);  // slider = 100
 const LOW_ZOOM = 85;
 const MID_ZOOM = 60;
 const HIGH_ZOOM = 38;
+
+// Dev sky mode: high overhead, centered on origin, very zoomed out
+const SKY_OFFSET = new THREE.Vector3(0, 100, 50);
+const SKY_ZOOM = 7;
+const SKY_TARGET = new THREE.Vector3(0, 0, -5); // slightly north to center the archipelago
 
 /** Compute offset & zoom from the 0-100 slider value */
 function getOffsetAndZoom(slider: number) {
@@ -115,14 +123,19 @@ export default function IsometricCamera() {
       return;
     }
 
-    // Desired positions
-    const desiredTarget = playerPos;
-    const desiredPosition = _v.copy(playerPos).add(offset);
+    // Dev sky mode: override target, position, and zoom
+    const isSky = devSkyModeRef.current;
+    const desiredTarget = isSky ? SKY_TARGET : playerPos;
+    const desiredPosition = isSky
+      ? _v.copy(SKY_TARGET).add(SKY_OFFSET)
+      : _v.copy(playerPos).add(offset);
+    const desiredZoom = isSky ? SKY_ZOOM : zoom;
 
-    // Smooth lerp
-    smoothTarget.current.lerp(desiredTarget, CAMERA.LERP_FACTOR);
-    smoothPosition.current.lerp(desiredPosition, CAMERA.LERP_FACTOR);
-    smoothZoom.current += (zoom - smoothZoom.current) * CAMERA.LERP_FACTOR;
+    // Smooth lerp (faster when transitioning to/from sky mode)
+    const lerpSpeed = isSky ? 0.35 : CAMERA.LERP_FACTOR;
+    smoothTarget.current.lerp(desiredTarget, lerpSpeed);
+    smoothPosition.current.lerp(desiredPosition, lerpSpeed);
+    smoothZoom.current += (desiredZoom - smoothZoom.current) * lerpSpeed;
 
     camera.position.copy(smoothPosition.current);
     camera.lookAt(

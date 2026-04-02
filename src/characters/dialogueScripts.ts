@@ -2186,9 +2186,20 @@ const FALLBACK_LINES: Record<string, string[]> = {
   lily:     ["The ferns look peaceful today.", "I found a new mushroom by the trail. It's very round.", "*quiet smile*"],
 };
 
-function makeFallbackScript(npcId: string, npcName: string): DialogueScript {
-  const lines = FALLBACK_LINES[npcId] ?? ["Nice to see you again."];
-  const line = lines[Math.floor(Math.random() * lines.length)];
+const RAIN_FALLBACK_LINES: Record<string, string[]> = {
+  rosie:    ["I was going to garden today, but the sky had other pla*n*s. Get it? Rains? Plans?", "Perfect weather for re-*dew*-cing your stress! ...I'll see myself out.", "The rain is kind of cozy, right? Just the two of us out here getting damp."],
+  blaze:    ["Rain doesn't stop me. If anything, it separates the serious ones from the rest.", "The weather's just another variable. I've trained in worse.", "I actually like the rain. Less distractions."],
+  pudge:    ["Oh! I was just thinking... rain means soup weather. Do you think we have soup ingredients?", "Kind of nice though, isn't it? Makes me want to curl up with something warm.", "*holds jacket tighter* Didn't expect rain. But I don't really mind."],
+  kiki:     ["The rain was foretold. I just wasn't sure when.", "Water erases things. Old patterns. Old feelings. There's meaning in that.", "I find the rain... clarifying. Like static washing away."],
+  sprocket: ["What do you call a wet penguin? *pause* ...Soaked. I haven't workshopped this one yet.", "I did NOT pack enough dry socks for this.", "The rain is ruining my hair. Which is impressive, because I don't have hair."],
+  lily:     ["Oh, the rain! The mushrooms are going to be incredible tomorrow.", "I love rainy days. Everything smells so alive.", "*tilts face up toward the rain* This is nice."],
+};
+
+function makeFallbackScript(npcId: string, npcName: string, isRainy = false): DialogueScript {
+  const pool = (isRainy && RAIN_FALLBACK_LINES[npcId])
+    ? RAIN_FALLBACK_LINES[npcId]
+    : (FALLBACK_LINES[npcId] ?? ["Nice to see you again."]);
+  const line = pool[Math.floor(Math.random() * pool.length)];
   return {
     id: `${npcId}_fallback`,
     startNode: 'greet',
@@ -2263,7 +2274,7 @@ export function resetNPCDialogueProgress(): void {
  *   mid  = 20 <= relationship < 60
  *   high = relationship >= 60
  */
-export function getDialogueForNPC(npcId: string, relationship: number, gameDay = 7): DialogueScript {
+export function getDialogueForNPC(npcId: string, relationship: number, gameDay = 7, isRainy = false): DialogueScript {
   const tierIndex = relationship >= 60 ? 2 : relationship >= 20 ? 1 : 0;
   const progress = getNPCDialogueDay(npcId);
 
@@ -2273,7 +2284,7 @@ export function getDialogueForNPC(npcId: string, relationship: number, gameDay =
     const dailyScripts = DAILY_DIALOGUES[npcId]?.[gameDay - 1];
     const firstNode = dailyScripts?.[tierIndex]?.nodes?.['start'];
     const name = firstNode?.speaker ?? npcId;
-    return makeFallbackScript(npcId, name);
+    return makeFallbackScript(npcId, name, isRainy);
   }
 
   const dayIndex = progress;
@@ -2287,7 +2298,7 @@ export function getDialogueForNPC(npcId: string, relationship: number, gameDay =
     // Already seen today — return fallback
     const firstNode = script.nodes[script.startNode];
     const name = firstNode?.speaker ?? npcId;
-    return makeFallbackScript(npcId, name);
+    return makeFallbackScript(npcId, name, isRainy);
   }
 
   // Fallback to legacy NPC_DIALOGUES
@@ -2301,7 +2312,7 @@ export function getDialogueForNPC(npcId: string, relationship: number, gameDay =
   if (hasSeenDialogue(script.id)) {
     const firstNode = script.nodes[script.startNode];
     const name = firstNode?.speaker ?? npcId;
-    return makeFallbackScript(npcId, name);
+    return makeFallbackScript(npcId, name, isRainy);
   }
 
   return script;
@@ -2311,13 +2322,13 @@ export function getDialogueForNPC(npcId: string, relationship: number, gameDay =
  * Pick the drama dialogue script for an NPC.
  * Falls back to regular chat dialogue if no drama script exists.
  */
-export function getDramaDialogueForNPC(npcId: string, relationship: number, gameDay = 7): DialogueScript {
+export function getDramaDialogueForNPC(npcId: string, relationship: number, gameDay = 7, isRainy = false): DialogueScript {
   const script = DRAMA_DIALOGUES[npcId];
-  if (!script) return getDialogueForNPC(npcId, relationship, gameDay);
+  if (!script) return getDialogueForNPC(npcId, relationship, gameDay, isRainy);
 
   // If already seen today, fall back to regular chat
   if (hasSeenDialogue(script.id)) {
-    return getDialogueForNPC(npcId, relationship, gameDay);
+    return getDialogueForNPC(npcId, relationship, gameDay, isRainy);
   }
 
   return script;

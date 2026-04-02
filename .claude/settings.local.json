@@ -26,7 +26,9 @@
       "Bash(ls C:/Users/kalib/Documents/Supercell/LubIsland/*.md)",
       "Bash(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 \"C:/Users/kalib/Documents/Supercell/LubIsland/public/audio/DayMusic.mp3\")",
       "Skill(update-docs)",
-      "Skill(update-docs:*)"
+      "Skill(update-docs:*)",
+      "Bash(/tmp/bug_analysis.txt:*)",
+      "Read(//tmp/**)"
     ]
   }
 }

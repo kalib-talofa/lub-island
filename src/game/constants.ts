@@ -121,7 +121,57 @@ export function getWeekSchedule(week: number): readonly DayType[] {
 // FTUE NPC arrival schedule (Week 1)
 // ---------------------------------------------------------------------------
 export const FTUE_ARRIVALS: Record<number, string[]> = {
-  1: ['rosie', 'blaze', 'pudge'],   // Day 1: first 3 NPCs
-  2: ['kiki', 'sprocket'],           // Day 2: 4th + 5th
-  3: ['lily'],                       // Day 3: 6th
+  1: ['pudge', 'kiki', 'sprocket'], // Day 1: first 3 NPCs
+  2: ['lily', 'rosie'],             // Day 2: 4th + 5th
+  3: ['blaze'],                     // Day 3: 6th
+};
+
+// ---------------------------------------------------------------------------
+// NPC zone unlocks: maps NPC id -> zone key that appears when they arrive
+// Base zones (villa, beach) are always present. Other zones unlock when the
+// associated NPC arrives during the FTUE.
+// ---------------------------------------------------------------------------
+export const NPC_ZONE_UNLOCKS: Record<string, string> = {
+  rosie: 'garden',
+  blaze: 'arena',
+  // pudge: villa is always present (base zone)
+  kiki: 'lookout',
+  // sprocket: beach is always present (base zone)
+  lily: 'jungle',
+};
+
+// ---------------------------------------------------------------------------
+// Unlockable structures: week + day when each structure becomes available.
+// Before unlock, a barrier blocks entry and a popup explains when it opens.
+// ---------------------------------------------------------------------------
+export const UNLOCKABLE_STRUCTURES: Record<string, { week: number; day: number; label: string }> = {
+  dock: { week: 1, day: 3, label: 'Wooden Dock' },
+  cave: { week: 2, day: 3, label: 'Mysterious Cave' },
+};
+
+// Cave zone position (for colliders and door triggers)
+export const CAVE_POSITION: [number, number, number] = [-17.5, 0, -2.1];
+
+// ---------------------------------------------------------------------------
+// Rainy days: list of { week, day } pairs that have rain.
+// ---------------------------------------------------------------------------
+export const RAINY_DAYS: readonly { week: number; day: number }[] = [
+  { week: 1, day: 2 },
+  { week: 2, day: 2 },
+];
+
+export function isRainyDay(week: number, day: number): boolean {
+  return RAINY_DAYS.some(r => r.week === week && r.day === day);
+}
+
+// ---------------------------------------------------------------------------
+// Land plots: each NPC arrival adds a new land mass around the base island.
+// center = world position of the plot, semiX/semiZ = ellipse half-axes.
+// The zone key must match the value in NPC_ZONE_UNLOCKS.
+// ---------------------------------------------------------------------------
+export const LAND_PLOTS: Record<string, { center: [number, number, number]; semiX: number; semiZ: number }> = {
+  garden:  { center: [28, 0, 0],    semiX: 12, semiZ: 10 },
+  arena:   { center: [-28, 0, 0],   semiX: 12, semiZ: 10 },
+  jungle:  { center: [0, 0, -30],   semiX: 10, semiZ: 14 },
+  lookout: { center: [14, 0, -22],  semiX: 10, semiZ: 10 },
 };

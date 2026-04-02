@@ -8,7 +8,6 @@ import { useGameStore } from '@/store/gameStore';
 import { useBiometricStore } from '@/store/biometricStore';
 import { useRelationshipStore } from '@/store/relationshipStore';
 import { usePlayerStore } from '@/store/playerStore';
-import { STARTING_CAST } from '@/characters/roster';
 import HUD from '@/ui/HUD';
 import DialogueBox from '@/ui/DialogueBox';
 import VirtualJoystick from '@/ui/VirtualJoystick';
@@ -58,6 +57,7 @@ export default function Game() {
     handleProducerPhone,
     dismissItemPopup,
     handleBedInteract,
+    handleLockedStructure,
     openInventory,
     closeInventory,
     handleUseItem,
@@ -203,6 +203,7 @@ export default function Game() {
           <Island
             onNPCInteract={handleNPCInteract}
             onBedInteract={handleBedInteract}
+            onLockedStructure={handleLockedStructure}
             droppedItems={state.droppedItems}
             onItemPickup={handleItemPickup}
           />

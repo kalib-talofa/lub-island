@@ -5,10 +5,12 @@ import * as THREE from "three";
 import { useFrame } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
 import { clone as cloneSkinnedScene } from "three/examples/jsm/utils/SkeletonUtils.js";
-import { PLAYER } from "@/game/constants";
+import { PLAYER, CAVE_POSITION, LAND_PLOTS } from "@/game/constants";
 import { ZONE_POSITIONS } from "@/scene/IslandEnvironment";
 import { VILLA_INTERIOR, BED_POSITIONS } from "@/scene/VillaInterior";
+import { CAVE_INTERIOR } from "@/scene/CaveInterior";
 import { useGameStore } from "@/store/gameStore";
+import { isZoneUnlocked, isStructureUnlocked } from "@/game/unlocks";
 
 // ---------------------------------------------------------------------------
 // Module-level refs for cross-component communication
@@ -19,6 +21,9 @@ export const playerTargetRef = { current: new THREE.Vector3(0, 0, 0) };
 export const joystickInputRef = {
   current: { x: 0, y: 0, active: false },
 };
+
+/** Set before exitVilla/exitCave to preserve playerPositionRef across component remount */
+const _preservePosition = { current: false };
 
 // ---------------------------------------------------------------------------
 // WASD keyboard input (module-level so it works alongside the joystick)
@@ -70,45 +75,53 @@ const zp = (zone: string, dx = 0, dz = 0): { cx: number; cz: number } => ({
   cz: ZONE_POSITIONS[zone][2] + dz,
 });
 
-const STRUCTURE_COLLIDERS: CircleCollider[] = [
-  // ---- Villa (centre) ----
-  // Split the main hall into two side colliders with a gap for the front door
-  // Back half of villa (deeper into -Z)
+// ---- Base colliders (always active) ----
+const BASE_COLLIDERS: CircleCollider[] = [
+  // Villa (centre) — split with gap for front door
   { ...zp("villa", 0, -1.5), radius: 3.0 },
-  // Left side of front (blocks walking through left wall)
   { ...zp("villa", -2.5, 1.5), radius: 1.8 },
-  // Right side of front (blocks walking through right wall)
   { ...zp("villa", 2.5, 1.5), radius: 1.8 },
-  // Left wing room at x=-4.5
   { ...zp("villa", -4.5, 0), radius: 2.0 },
-  // Right wing room at x=+4.5
   { ...zp("villa", 4.5, 0), radius: 2.0 },
-
-  // ---- Garden fountain ----
-  { ...zp("garden"), radius: 1.8 },
-  // Garden benches (two, at ±2 from centre)
-  { ...zp("garden", 2.0, 0), radius: 0.6 },
-  { ...zp("garden", -2.0, 0), radius: 0.6 },
-
-  // ---- Challenge Arena podium ----
-  { ...zp("arena"), radius: 1.0 },
-
-  // ---- Lookout mound ----
-  { ...zp("lookout"), radius: 2.8 },
-
-  // ---- Beach palm trees (relative to beach zone) ----
+  // Beach palm trees & umbrellas
   { ...zp("beach", -8, -2), radius: 0.5 },
   { ...zp("beach", 10, -1.5), radius: 0.5 },
   { ...zp("beach", -1, -3), radius: 0.5 },
-  // Beach umbrellas
   { ...zp("beach", -3, -0.5), radius: 0.4 },
   { ...zp("beach", 3, -1), radius: 0.4 },
   { ...zp("beach", 8, -0.5), radius: 0.4 },
+  // Standalone trees
+  { cx: -10, cz: 12, radius: 0.5 },
+  { cx: 6, cz: -6, radius: 0.5 },
+  { cx: -14, cz: -4, radius: 0.5 },
+  { cx: 10, cz: -10, radius: 0.5 },
+  { cx: -8, cz: 4, radius: 0.5 },
+  { cx: 8, cz: 5, radius: 0.5 },
+  { cx: -5, cz: -4, radius: 0.5 },
+  { cx: 4, cz: -10, radius: 0.5 },
+  // Rocks
+  { cx: -16, cz: 10, radius: 0.5 },
+  { cx: -12, cz: 14, radius: 0.35 },
+];
 
-  // ---- Jungle trees (relative to jungle zone) ----
-  { ...zp("jungle", -4, -5.5), radius: 0.5 },  // palm
-  { ...zp("jungle", 5, -4.5), radius: 0.5 },   // palm
-  // Jungle simple trees (dense cluster)
+// ---- Zone-specific colliders (active only when zone is unlocked) ----
+const GARDEN_ZONE_COLLIDERS: CircleCollider[] = [
+  { ...zp("garden"), radius: 1.8 },
+  { ...zp("garden", 2.0, 0), radius: 0.6 },
+  { ...zp("garden", -2.0, 0), radius: 0.6 },
+];
+
+const ARENA_ZONE_COLLIDERS: CircleCollider[] = [
+  { ...zp("arena"), radius: 1.0 },
+];
+
+const LOOKOUT_ZONE_COLLIDERS: CircleCollider[] = [
+  { ...zp("lookout"), radius: 2.8 },
+];
+
+const JUNGLE_ZONE_COLLIDERS: CircleCollider[] = [
+  { ...zp("jungle", -4, -5.5), radius: 0.5 },
+  { ...zp("jungle", 5, -4.5), radius: 0.5 },
   { ...zp("jungle", -6, -2), radius: 0.5 },
   { ...zp("jungle", -4, -4), radius: 0.5 },
   { ...zp("jungle", -2, -1), radius: 0.5 },
@@ -117,33 +130,22 @@ const STRUCTURE_COLLIDERS: CircleCollider[] = [
   { ...zp("jungle", 4, -2), radius: 0.5 },
   { ...zp("jungle", 6, -4), radius: 0.5 },
   { ...zp("jungle", -5, -6), radius: 0.5 },
-
-  // ---- Standalone trees (placed in world root) ----
-  { cx: -10, cz: 12, radius: 0.5 },   // palm
-  { cx: 6, cz: -6, radius: 0.5 },     // palm
-  { cx: -14, cz: -4, radius: 0.5 },   // palm
-  { cx: 10, cz: -10, radius: 0.5 },   // palm
-  { cx: -8, cz: 4, radius: 0.5 },     // simple tree
-  { cx: 8, cz: 5, radius: 0.5 },      // simple tree
-  { cx: -5, cz: -4, radius: 0.5 },    // simple tree
-  { cx: 4, cz: -10, radius: 0.5 },    // simple tree
-
-  // ---- Rocks ----
-  { cx: -16, cz: 10, radius: 0.5 },
-  { cx: -12, cz: 14, radius: 0.35 },
 ];
 
-function collidesWithStructure(x: number, z: number, playerRadius: number): boolean {
-  for (const c of STRUCTURE_COLLIDERS) {
-    const dx = x - c.cx;
-    const dz = z - c.cz;
-    const minDist = c.radius + playerRadius;
-    if (dx * dx + dz * dz < minDist * minDist) {
-      return true;
-    }
-  }
-  return false;
-}
+// Cave exterior — solid block when locked, side-colliders with door gap when unlocked
+const CAVE_LOCKED_COLLIDERS: CircleCollider[] = [
+  { cx: CAVE_POSITION[0], cz: CAVE_POSITION[2], radius: 2.8 },
+];
+const CAVE_UNLOCKED_COLLIDERS: CircleCollider[] = [
+  { cx: CAVE_POSITION[0] - 2.2, cz: CAVE_POSITION[2], radius: 1.5 },
+  { cx: CAVE_POSITION[0] + 2.2, cz: CAVE_POSITION[2], radius: 1.5 },
+  { cx: CAVE_POSITION[0], cz: CAVE_POSITION[2] - 1.8, radius: 1.5 },
+];
+
+// Dock barrier when locked — blocks entry onto the pier
+const DOCK_LOCKED_COLLIDERS: CircleCollider[] = [
+  { cx: ZONE_POSITIONS.dock[0], cz: ZONE_POSITIONS.dock[2], radius: 1.5 },
+];
 
 /**
  * Resolve movement against a list of circle colliders using normal-based sliding.
@@ -215,17 +217,48 @@ const INTERIOR_COLLIDERS: CircleCollider[] = [
   { cx: 7, cz: 3, radius: 1.2 },
 ];
 
-function collidesWithInterior(x: number, z: number, playerRadius: number): boolean {
-  for (const c of INTERIOR_COLLIDERS) {
-    const dx = x - c.cx;
-    const dz = z - c.cz;
-    const minDist = c.radius + playerRadius;
-    if (dx * dx + dz * dz < minDist * minDist) {
-      return true;
-    }
-  }
-  return false;
+// ---------------------------------------------------------------------------
+// Cave interior colliders
+// ---------------------------------------------------------------------------
+
+const CAVE_INTERIOR_COLLIDERS: CircleCollider[] = [
+  // Glowing pool in center
+  { cx: 0, cz: -1, radius: 2.2 },
+  // Rock formations
+  { cx: -5, cz: -4, radius: 0.6 },
+  { cx: 4, cz: -3, radius: 0.6 },
+  { cx: -3, cz: 3, radius: 0.6 },
+  { cx: 5, cz: 2, radius: 0.6 },
+];
+
+/** Check if player is within the cave room bounds */
+function withinCaveRoom(x: number, z: number, margin: number): boolean {
+  const halfW = CAVE_INTERIOR.ROOM_WIDTH / 2 - margin;
+  const halfD = CAVE_INTERIOR.ROOM_DEPTH / 2 - margin;
+  return x > -halfW && x < halfW && z > -halfD && z < halfD;
 }
+
+/** Check if player is at the cave exit door zone */
+function isAtCaveDoorExit(x: number, z: number): boolean {
+  const doorHalf = CAVE_INTERIOR.DOOR_WIDTH / 2;
+  return x > -doorHalf && x < doorHalf && z > CAVE_INTERIOR.DOOR_Z - 1.0;
+}
+
+// Cave door trigger zone on the outdoor island (front of cave exterior)
+const CAVE_DOOR_OUTDOOR = {
+  x: CAVE_POSITION[0],
+  z: CAVE_POSITION[2] + 1.6,
+  radius: 0.8,
+};
+
+function isAtCaveDoorOutside(x: number, z: number): boolean {
+  const dx = x - CAVE_DOOR_OUTDOOR.x;
+  const dz = z - CAVE_DOOR_OUTDOOR.z;
+  return dx * dx + dz * dz < CAVE_DOOR_OUTDOOR.radius * CAVE_DOOR_OUTDOOR.radius;
+}
+
+// Locked structure proximity radius
+const LOCKED_PROXIMITY_RADIUS = 4.0;
 
 /** Check if player is within the room bounds (walls) */
 function withinRoom(x: number, z: number, margin: number): boolean {
@@ -259,9 +292,11 @@ function isAtVillaDoorOutside(x: number, z: number): boolean {
 
 const ISLAND_RADIUS = 20;
 
+interface PlotBounds { cx: number; cz: number; semiX: number; semiZ: number }
+
 /** Check if a position is within the walkable island area.
- *  This is the main circle (radius 20) PLUS the beach/dock extensions to the south. */
-function isWithinIsland(x: number, z: number): boolean {
+ *  Includes the base island + any unlocked NPC land plots. */
+function isWithinIsland(x: number, z: number, extraPlots?: PlotBounds[]): boolean {
   // Main island circle
   if (x * x + z * z < ISLAND_RADIUS * ISLAND_RADIUS) return true;
   // Beach sand — ellipse centered at (0, 16), semi-axes 18 x 6
@@ -280,6 +315,14 @@ function isWithinIsland(x: number, z: number): boolean {
   const nx = x / 14;
   const nz = (z + 6) / 10;
   if (nx * nx + nz * nz < 1) return true;
+  // Dynamic NPC land plots
+  if (extraPlots) {
+    for (const p of extraPlots) {
+      const px = (x - p.cx) / p.semiX;
+      const pz = (z - p.cz) / p.semiZ;
+      if (px * px + pz * pz < 1) return true;
+    }
+  }
   return false;
 }
 
@@ -298,16 +341,20 @@ interface PlayerControllerProps {
   position?: [number, number, number];
   isMovementLocked: boolean;
   isIndoors?: boolean;
+  indoorLocation?: 'villa' | 'cave' | null;
   sleepingNPCs?: string[];
   onBedInteract?: (npcId: string, isSleeping: boolean) => void;
+  onLockedStructure?: (key: string) => void;
 }
 
 export default function PlayerController({
   position = [0, 0, 0],
   isMovementLocked,
   isIndoors = false,
+  indoorLocation = null,
   sleepingNPCs = [],
   onBedInteract,
+  onLockedStructure,
 }: PlayerControllerProps) {
   const groupRef = useRef<THREE.Group>(null);
   const bobPhase = useRef(0);
@@ -315,24 +362,69 @@ export default function PlayerController({
   const isMoving = useRef(false);
   const doorCooldown = useRef(0); // prevent rapid enter/exit
   const bedCooldown = useRef(0); // prevent rapid bed interactions
+  const lockedCooldown = useRef(0); // prevent rapid locked structure popups
 
   const enterVilla = useGameStore((s) => s.enterVilla);
   const exitVilla = useGameStore((s) => s.exitVilla);
+  const enterCave = useGameStore((s) => s.enterCave);
+  const exitCave = useGameStore((s) => s.exitCave);
+  const arrivedNPCIds = useGameStore((s) => s.arrivedNPCIds);
+  const week = useGameStore((s) => s.week);
+  const day = useGameStore((s) => s.day);
   const isNight = useGameStore((s) => s.phase === 'NIGHTTIME_FREE');
 
-  // Initialise module-level refs once
+  // Dynamic outdoor colliders — recomputed when zones/structures unlock
+  const activeColliders = useMemo(() => {
+    const colliders: CircleCollider[] = [...BASE_COLLIDERS];
+    if (isZoneUnlocked('garden', arrivedNPCIds)) colliders.push(...GARDEN_ZONE_COLLIDERS);
+    if (isZoneUnlocked('arena', arrivedNPCIds)) colliders.push(...ARENA_ZONE_COLLIDERS);
+    if (isZoneUnlocked('lookout', arrivedNPCIds)) colliders.push(...LOOKOUT_ZONE_COLLIDERS);
+    if (isZoneUnlocked('jungle', arrivedNPCIds)) colliders.push(...JUNGLE_ZONE_COLLIDERS);
+    if (isStructureUnlocked('cave', week, day)) {
+      colliders.push(...CAVE_UNLOCKED_COLLIDERS);
+    } else {
+      colliders.push(...CAVE_LOCKED_COLLIDERS);
+    }
+    if (!isStructureUnlocked('dock', week, day)) {
+      colliders.push(...DOCK_LOCKED_COLLIDERS);
+    }
+    return colliders;
+  }, [arrivedNPCIds, week, day]);
+  const activeCollidersRef = useRef(activeColliders);
+  activeCollidersRef.current = activeColliders;
+
+  // Compute unlocked land plots for walkable bounds
+  const unlockedPlots = useMemo(() => {
+    const plots: PlotBounds[] = [];
+    for (const [zoneKey, plot] of Object.entries(LAND_PLOTS)) {
+      if (isZoneUnlocked(zoneKey, arrivedNPCIds)) {
+        plots.push({ cx: plot.center[0], cz: plot.center[2], semiX: plot.semiX, semiZ: plot.semiZ });
+      }
+    }
+    return plots;
+  }, [arrivedNPCIds]);
+  const unlockedPlotsRef = useRef(unlockedPlots);
+  unlockedPlotsRef.current = unlockedPlots;
+
+  // Initialise module-level refs — skip if exiting a building (position already set)
   useMemo(() => {
-    playerPositionRef.current.set(position[0], position[1], position[2]);
-    playerTargetRef.current.set(position[0], position[1], position[2]);
+    if (_preservePosition.current) {
+      _preservePosition.current = false;
+      playerTargetRef.current.copy(playerPositionRef.current);
+    } else {
+      playerPositionRef.current.set(position[0], position[1], position[2]);
+      playerTargetRef.current.set(position[0], position[1], position[2]);
+    }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ----- frame loop -------------------------------------------------------
   useFrame((_, delta) => {
     if (!groupRef.current) return;
 
-    // Door cooldown timer
+    // Cooldown timers
     if (doorCooldown.current > 0) doorCooldown.current -= delta;
     if (bedCooldown.current > 0) bedCooldown.current -= delta;
+    if (lockedCooldown.current > 0) lockedCooldown.current -= delta;
 
     // Merge joystick + WASD input
     const joy = joystickInputRef.current;
@@ -355,73 +447,133 @@ export default function PlayerController({
       const nextZ = playerPositionRef.current.z + worldZ * speed;
 
       if (isIndoors) {
-        // ---- INDOOR movement (villa interior) ----
-        const inRoom = withinRoom(nextX, nextZ, PLAYER.COLLISION_RADIUS);
-        const hitsInterior = collidesWithInterior(nextX, nextZ, PLAYER.COLLISION_RADIUS);
+        if (indoorLocation === 'cave') {
+          // ---- INDOOR movement (cave interior) ----
+          const inRoom = withinCaveRoom(nextX, nextZ, PLAYER.COLLISION_RADIUS);
 
-        if (inRoom) {
-          const resolved = resolveSlide(
-            playerPositionRef.current.x, playerPositionRef.current.z,
-            nextX, nextZ,
-            PLAYER.COLLISION_RADIUS,
-            INTERIOR_COLLIDERS,
-          );
-          // Also clamp to room bounds after sliding
-          if (withinRoom(resolved.x, resolved.z, PLAYER.COLLISION_RADIUS)) {
-            playerPositionRef.current.x = resolved.x;
-            playerPositionRef.current.z = resolved.z;
+          if (inRoom) {
+            const resolved = resolveSlide(
+              playerPositionRef.current.x, playerPositionRef.current.z,
+              nextX, nextZ,
+              PLAYER.COLLISION_RADIUS,
+              CAVE_INTERIOR_COLLIDERS,
+            );
+            if (withinCaveRoom(resolved.x, resolved.z, PLAYER.COLLISION_RADIUS)) {
+              playerPositionRef.current.x = resolved.x;
+              playerPositionRef.current.z = resolved.z;
+            }
           }
-        }
 
-        // Check for door exit
-        if (doorCooldown.current <= 0 && isAtDoorExit(playerPositionRef.current.x, playerPositionRef.current.z)) {
-          doorCooldown.current = 1.0;
-          playerPositionRef.current.set(
-            VILLA_INTERIOR.EXIT_POSITION[0],
-            VILLA_INTERIOR.EXIT_POSITION[1],
-            VILLA_INTERIOR.EXIT_POSITION[2],
-          );
-          exitVilla();
-        }
+          // Check for cave door exit
+          if (doorCooldown.current <= 0 && isAtCaveDoorExit(playerPositionRef.current.x, playerPositionRef.current.z)) {
+            doorCooldown.current = 1.0;
+            playerPositionRef.current.set(
+              CAVE_INTERIOR.EXIT_POSITION[0],
+              CAVE_INTERIOR.EXIT_POSITION[1],
+              CAVE_INTERIOR.EXIT_POSITION[2],
+            );
+            _preservePosition.current = true;
+            exitCave();
+          }
+        } else {
+          // ---- INDOOR movement (villa interior) ----
+          const inRoom = withinRoom(nextX, nextZ, PLAYER.COLLISION_RADIUS);
 
-        // Check for bed proximity interaction
-        if (bedCooldown.current <= 0 && onBedInteract) {
-          for (const bed of BED_POSITIONS) {
-            const dx = playerPositionRef.current.x - bed.position[0];
-            const dz = playerPositionRef.current.z - bed.position[2];
-            if (dx * dx + dz * dz < BED_INTERACT_RADIUS * BED_INTERACT_RADIUS) {
-              bedCooldown.current = 2.0;
-              onBedInteract(bed.npcId, sleepingNPCs.includes(bed.npcId));
-              break;
+          if (inRoom) {
+            const resolved = resolveSlide(
+              playerPositionRef.current.x, playerPositionRef.current.z,
+              nextX, nextZ,
+              PLAYER.COLLISION_RADIUS,
+              INTERIOR_COLLIDERS,
+            );
+            if (withinRoom(resolved.x, resolved.z, PLAYER.COLLISION_RADIUS)) {
+              playerPositionRef.current.x = resolved.x;
+              playerPositionRef.current.z = resolved.z;
+            }
+          }
+
+          // Check for villa door exit
+          if (doorCooldown.current <= 0 && isAtDoorExit(playerPositionRef.current.x, playerPositionRef.current.z)) {
+            doorCooldown.current = 1.0;
+            playerPositionRef.current.set(
+              VILLA_INTERIOR.EXIT_POSITION[0],
+              VILLA_INTERIOR.EXIT_POSITION[1],
+              VILLA_INTERIOR.EXIT_POSITION[2],
+            );
+            _preservePosition.current = true;
+            exitVilla();
+          }
+
+          // Check for bed proximity interaction
+          if (bedCooldown.current <= 0 && onBedInteract) {
+            for (const bed of BED_POSITIONS) {
+              const dx = playerPositionRef.current.x - bed.position[0];
+              const dz = playerPositionRef.current.z - bed.position[2];
+              if (dx * dx + dz * dz < BED_INTERACT_RADIUS * BED_INTERACT_RADIUS) {
+                bedCooldown.current = 2.0;
+                onBedInteract(bed.npcId, sleepingNPCs.includes(bed.npcId));
+                break;
+              }
             }
           }
         }
       } else {
         // ---- OUTDOOR movement (island) ----
-        const withinIslandBounds = isWithinIsland(nextX, nextZ);
-        const hitsStructure = collidesWithStructure(nextX, nextZ, PLAYER.COLLISION_RADIUS);
+        const withinIslandBounds = isWithinIsland(nextX, nextZ, unlockedPlotsRef.current);
 
-        // Check for villa door entry — modify collision near front door
+        // Check for villa door entry
         const nearVillaDoor = isAtVillaDoorOutside(nextX, nextZ);
+        // Check for cave door entry (only when cave is unlocked)
+        const caveUnlocked = isStructureUnlocked('cave', week, day);
+        const nearCaveDoor = caveUnlocked && isAtCaveDoorOutside(nextX, nextZ);
 
         if (nearVillaDoor && doorCooldown.current <= 0) {
           doorCooldown.current = 1.0;
-          // Teleport inside and enter
           playerPositionRef.current.set(
             VILLA_INTERIOR.ENTRY_POSITION[0],
             VILLA_INTERIOR.ENTRY_POSITION[1],
             VILLA_INTERIOR.ENTRY_POSITION[2],
           );
           enterVilla();
+        } else if (nearCaveDoor && doorCooldown.current <= 0) {
+          doorCooldown.current = 1.0;
+          playerPositionRef.current.set(
+            CAVE_INTERIOR.ENTRY_POSITION[0],
+            CAVE_INTERIOR.ENTRY_POSITION[1],
+            CAVE_INTERIOR.ENTRY_POSITION[2],
+          );
+          enterCave();
         } else if (withinIslandBounds) {
           const resolved = resolveSlide(
             playerPositionRef.current.x, playerPositionRef.current.z,
             nextX, nextZ,
             PLAYER.COLLISION_RADIUS,
-            STRUCTURE_COLLIDERS,
+            activeCollidersRef.current,
           );
           playerPositionRef.current.x = resolved.x;
           playerPositionRef.current.z = resolved.z;
+        }
+
+        // Check locked structure proximity
+        if (lockedCooldown.current <= 0 && onLockedStructure) {
+          const px = playerPositionRef.current.x;
+          const pz = playerPositionRef.current.z;
+          if (!isStructureUnlocked('dock', week, day)) {
+            const ddx = px - ZONE_POSITIONS.dock[0];
+            const ddz = pz - ZONE_POSITIONS.dock[2];
+            if (ddx * ddx + ddz * ddz < LOCKED_PROXIMITY_RADIUS * LOCKED_PROXIMITY_RADIUS) {
+              lockedCooldown.current = 3.0;
+              onLockedStructure('dock');
+            }
+          }
+          if (!isStructureUnlocked('cave', week, day)) {
+            const dcx = px - CAVE_POSITION[0];
+            const dcz = pz - CAVE_POSITION[2];
+            if (dcx * dcx + dcz * dcz < LOCKED_PROXIMITY_RADIUS * LOCKED_PROXIMITY_RADIUS) {
+              lockedCooldown.current = 3.0;
+              onLockedStructure('cave');
+            }
+          }
         }
       }
 
@@ -458,7 +610,7 @@ export default function PlayerController({
   // ---- render ------------------------------------------------------------
   return (
     <group ref={groupRef} position={position}>
-      {isNight && (
+      {(isNight || indoorLocation === 'cave') && (
         <pointLight
           color="#ffe8a0"
           intensity={6}

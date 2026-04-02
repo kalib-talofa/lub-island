@@ -27,6 +27,14 @@ const NIGHT_SKY_COLOR = new THREE.Color("#2A1A40"); // dark purple sky
 const NIGHT_GROUND_COLOR = new THREE.Color("#1A1A30"); // purple-tinted ground
 const NIGHT_HEMI_INTENSITY = 0.3;
 
+// Rainy day lighting — overcast, grey-blue, diffuse
+const RAIN_AMBIENT_INTENSITY = 0.5;
+const RAIN_DIR_INTENSITY = 0.4;
+const RAIN_DIR_COLOR = new THREE.Color("#B0C0D0"); // cool grey-blue
+const RAIN_SKY_COLOR = new THREE.Color("#6A7F8E"); // overcast sky
+const RAIN_GROUND_COLOR = new THREE.Color("#3A4A38"); // dark wet ground
+const RAIN_HEMI_INTENSITY = 0.55;
+
 // Warm night point-lights (torches / villa lights) — stronger emissive feel
 const NIGHT_POINT_INTENSITY = 2.5;
 const NIGHT_POINT_COLOR = new THREE.Color("#FF9944");
@@ -39,9 +47,10 @@ const LERP_FACTOR = 0.02; // ~2-3s transition
 
 interface DayNightCycleProps {
   isNight: boolean;
+  isRainy: boolean;
 }
 
-export default function DayNightCycle({ isNight }: DayNightCycleProps) {
+export default function DayNightCycle({ isNight, isRainy }: DayNightCycleProps) {
   // Refs for lights we need to animate each frame
   const ambientRef = useRef<THREE.AmbientLight>(null);
   const dirRef = useRef<THREE.DirectionalLight>(null);
@@ -52,6 +61,8 @@ export default function DayNightCycle({ isNight }: DayNightCycleProps) {
 
   // Lerped "nightness" value: 0 = full day, 1 = full night
   const nightAmount = useRef(isNight ? 1 : 0);
+  // Lerped "raininess" value: 0 = clear, 1 = full rain
+  const rainAmount = useRef(isRainy ? 1 : 0);
 
   // Scratch colours to avoid per-frame allocations
   const scratch = useMemo(
@@ -65,28 +76,29 @@ export default function DayNightCycle({ isNight }: DayNightCycleProps) {
   );
 
   useFrame(() => {
-    // Advance lerp toward target
-    const target = isNight ? 1 : 0;
-    nightAmount.current += (target - nightAmount.current) * LERP_FACTOR;
+    // Advance lerps toward targets
+    const nightTarget = isNight ? 1 : 0;
+    nightAmount.current += (nightTarget - nightAmount.current) * LERP_FACTOR;
     const t = nightAmount.current;
 
+    const rainTarget = isRainy ? 1 : 0;
+    rainAmount.current += (rainTarget - rainAmount.current) * LERP_FACTOR;
+    const r = rainAmount.current;
+
     // ---- ambient light ---------------------------------------------------
+    // Day base blends toward rain, then that blends toward night
     if (ambientRef.current) {
-      ambientRef.current.intensity = THREE.MathUtils.lerp(
-        DAY_AMBIENT_INTENSITY,
-        NIGHT_AMBIENT_INTENSITY,
-        t,
-      );
+      const dayBase = THREE.MathUtils.lerp(DAY_AMBIENT_INTENSITY, RAIN_AMBIENT_INTENSITY, r);
+      ambientRef.current.intensity = THREE.MathUtils.lerp(dayBase, NIGHT_AMBIENT_INTENSITY, t);
     }
 
     // ---- directional light -----------------------------------------------
     if (dirRef.current) {
-      dirRef.current.intensity = THREE.MathUtils.lerp(
-        DAY_DIR_INTENSITY,
-        NIGHT_DIR_INTENSITY,
-        t,
-      );
-      scratch.dirColor.copy(DAY_DIR_COLOR).lerp(NIGHT_DIR_COLOR, t);
+      const dayBase = THREE.MathUtils.lerp(DAY_DIR_INTENSITY, RAIN_DIR_INTENSITY, r);
+      dirRef.current.intensity = THREE.MathUtils.lerp(dayBase, NIGHT_DIR_INTENSITY, t);
+
+      // Color: day→rain by r, then →night by t
+      scratch.dirColor.copy(DAY_DIR_COLOR).lerp(RAIN_DIR_COLOR, r).lerp(NIGHT_DIR_COLOR, t);
       dirRef.current.color.copy(scratch.dirColor);
 
       scratch.dirPos.set(
@@ -99,13 +111,11 @@ export default function DayNightCycle({ isNight }: DayNightCycleProps) {
 
     // ---- hemisphere light ------------------------------------------------
     if (hemiRef.current) {
-      hemiRef.current.intensity = THREE.MathUtils.lerp(
-        DAY_HEMI_INTENSITY,
-        NIGHT_HEMI_INTENSITY,
-        t,
-      );
-      scratch.skyColor.copy(DAY_SKY_COLOR).lerp(NIGHT_SKY_COLOR, t);
-      scratch.groundColor.copy(DAY_GROUND_COLOR).lerp(NIGHT_GROUND_COLOR, t);
+      const dayHemiBase = THREE.MathUtils.lerp(DAY_HEMI_INTENSITY, RAIN_HEMI_INTENSITY, r);
+      hemiRef.current.intensity = THREE.MathUtils.lerp(dayHemiBase, NIGHT_HEMI_INTENSITY, t);
+
+      scratch.skyColor.copy(DAY_SKY_COLOR).lerp(RAIN_SKY_COLOR, r).lerp(NIGHT_SKY_COLOR, t);
+      scratch.groundColor.copy(DAY_GROUND_COLOR).lerp(RAIN_GROUND_COLOR, r).lerp(NIGHT_GROUND_COLOR, t);
       hemiRef.current.color.copy(scratch.skyColor);
       hemiRef.current.groundColor.copy(scratch.groundColor);
     }

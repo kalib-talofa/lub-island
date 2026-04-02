@@ -6,10 +6,11 @@ import { useBiometricStore } from '@/store/biometricStore';
 import { useGameStore } from '@/store/gameStore';
 import { useRelationshipStore } from '@/store/relationshipStore';
 import { usePlayerStore } from '@/store/playerStore';
-import { cameraAngleRef } from '@/scene/IsometricCamera';
+import { cameraAngleRef, devSkyModeRef } from '@/scene/IsometricCamera';
 import { ITEM_DEFS, JOURNAL_DEFS } from '@/systems/items';
 import { droppedItemsRef, triggerNightSpawnRef } from '@/game/GameLoop';
 import { playerPositionRef } from '@/scene/PlayerController';
+import { STARTING_CAST } from '@/characters/roster';
 
 export default function DevToolbar() {
   const [visible, setVisible] = useState(false);
@@ -76,12 +77,31 @@ export default function DevToolbar() {
     gameFolder.add({ advanceDay: () => useGameStore.getState().advanceDay() }, 'advanceDay').name('☀️ Advance to Next Day');
     gameFolder.add({ advanceToCeremony: () => useGameStore.getState().advanceToCeremony() }, 'advanceToCeremony').name('🏛️ Advance to Ceremony');
     gameFolder.add({ resetWeek: () => useGameStore.getState().resetWeek() }, 'resetWeek').name('🔄 Reset Week');
+    gameFolder.add({
+      spawnAll: () => {
+        const allIds = STARTING_CAST.filter(c => c.id !== 'player').map(c => c.id);
+        useGameStore.getState().setArrivedNPCIds(allIds);
+      },
+    }, 'spawnAll').name('🏝️ Spawn All NPCs & Plots');
+
+    const arrivalProxy = { arrived: useGameStore.getState().arrivedNPCIds.join(', ') || '(none)' };
+    const arrivedCtrl = gameFolder.add(arrivalProxy, 'arrived').name('Arrived NPCs').disable();
+
+    // Weather controls
+    const weatherFolder = gui.addFolder('🌦️ Weather');
+    const weatherProxy = { isRainy: useGameStore.getState().isRainy };
+    const rainyCtrl = weatherFolder.add(weatherProxy, 'isRainy').name('Raining').disable();
+    weatherFolder.add({ startRain: () => useGameStore.getState().setRainy(true) }, 'startRain').name('🌧️ Start Rainy Day');
+    weatherFolder.add({ stopRain: () => useGameStore.getState().setRainy(false) }, 'stopRain').name('☀️ Clear Rain');
 
     // Camera angle slider
     const cameraFolder = gui.addFolder('📷 Camera');
-    const cameraProxy = { angle: cameraAngleRef.current };
+    const cameraProxy = { angle: cameraAngleRef.current, skyMode: devSkyModeRef.current };
     cameraFolder.add(cameraProxy, 'angle', 0, 100, 1).name('Camera Angle').onChange((v: number) => {
       cameraAngleRef.current = v;
+    });
+    cameraFolder.add(cameraProxy, 'skyMode').name('🛰️ Dev Sky Mode').onChange((v: boolean) => {
+      devSkyModeRef.current = v;
     });
 
     // Items - add any item to inventory
@@ -161,6 +181,12 @@ export default function DevToolbar() {
       dayCtrl.updateDisplay();
       eventsCtrl.updateDisplay();
       phaseCtrl.updateDisplay();
+
+      weatherProxy.isRainy = game.isRainy;
+      rainyCtrl.updateDisplay();
+
+      arrivalProxy.arrived = game.arrivedNPCIds.join(', ') || '(none)';
+      arrivedCtrl.updateDisplay();
 
       // Items
       const player = usePlayerStore.getState();

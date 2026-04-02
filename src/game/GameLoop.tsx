@@ -13,6 +13,7 @@ import { getDialogueForNPC, getDramaDialogueForNPC, markDialogueSeen, resetSeenD
 import { DialogueRunner, DialogueLine } from '@/utils/ink';
 import { ENERGY_COSTS, PROD_ENERGY, FTUE_ARRIVALS, getDaysInWeek } from '@/game/constants';
 import { isCeremonyDay, isFreeRoamDay } from '@/systems/calendar';
+import { getStructureLockMessage } from '@/game/unlocks';
 import { EventType, GameEvent, ItemDef } from '@/characters/CharacterData';
 import { getRelationshipReward } from '@/systems/challenge';
 import { generateNightlyDrops, DroppedItem } from '@/systems/items';
@@ -76,9 +77,6 @@ export interface GameLoopState {
   completedEventIds: string[];
   // ID of the event that was started via the event button — completed when dialogue ends
   activeEventId: string | null;
-
-  // NPC arrival tracking (FTUE progressive arrivals)
-  arrivedNPCIds: string[];
 }
 
 /** Module-level ref so DevToolbar can read active drops without prop drilling */
@@ -126,7 +124,6 @@ export function useGameLoop() {
     producerChoice: null,
     completedEventIds: [],
     activeEventId: null,
-    arrivedNPCIds: [],
   });
 
 
@@ -134,9 +131,9 @@ export function useGameLoop() {
   const activeCast = useMemo(() =>
     STARTING_CAST.filter(c =>
       !relStore.eliminated.includes(c.id) &&
-      state.arrivedNPCIds.includes(c.id)
+      gameStore.arrivedNPCIds.includes(c.id)
     ),
-    [relStore.eliminated, state.arrivedNPCIds]
+    [relStore.eliminated, gameStore.arrivedNPCIds]
   );
 
   // ---------------------------------------------------------------------------
@@ -291,13 +288,13 @@ export function useGameLoop() {
     const events = generateDailyEvents(gameStore.day, gameStore.week, startCast, null, initialArrivals);
     const briefingEvents = events.map(e => e.title);
 
+    gameStore.setArrivedNPCIds(initialArrivals);
     setState(s => ({
       ...s,
       showMainMenu: false,
       showMorningBriefing: true,
       dailyEvents: events,
       briefingEvents,
-      arrivedNPCIds: initialArrivals,
       completedEventIds: [],
       activeEventId: null,
     }));
@@ -336,7 +333,7 @@ export function useGameLoop() {
     }
 
     const relationship = relStore.getRelationship(npcId);
-    const script = getDialogueForNPC(npcId, relationship, gameStore.totalDaysPlayed);
+    const script = getDialogueForNPC(npcId, relationship, gameStore.totalDaysPlayed, gameStore.isRainy);
 
     const runner = new DialogueRunner(script, {
       charm: bio.charm,
@@ -432,6 +429,13 @@ export function useGameLoop() {
   // Cancel dialogue (close button or walked away)
   const cancelDialogue = useCallback(() => {
     if (!state.dialogueActive) return;
+
+    // If this dialogue was triggered by an event, complete it so the phase
+    // returns to DAYTIME_FREE and the UI reappears.
+    if (state.activeEventId) {
+      resolveDialogueEventCompletion(state.currentNPCId);
+    }
+
     setState(s => ({
       ...s,
       dialogueActive: false,
@@ -440,7 +444,7 @@ export function useGameLoop() {
       currentNPCId: null,
       currentScriptId: null,
     }));
-  }, [state.dialogueActive]);
+  }, [state.dialogueActive, state.activeEventId, state.currentNPCId, resolveDialogueEventCompletion]);
 
   // Dialogue advance (no choices, just tap to continue)
   const handleDialogueAdvance = useCallback(() => {
@@ -524,7 +528,7 @@ export function useGameLoop() {
         if (event.type === 'drama') {
           // Drama events use drama-specific dialogue scripts
           const relationship = relStore.getRelationship(npc.id);
-          const script = getDramaDialogueForNPC(npc.id, relationship, gameStore.totalDaysPlayed);
+          const script = getDramaDialogueForNPC(npc.id, relationship, gameStore.totalDaysPlayed, gameStore.isRainy);
           const runner = new DialogueRunner(script, {
             charm: bio.charm,
             energy: bio.energy,
@@ -650,11 +654,12 @@ export function useGameLoop() {
     }
 
     // Add FTUE progressive arrivals for Week 1
-    let newArrivedNPCIds = state.arrivedNPCIds;
+    let newArrivedNPCIds = gameStore.arrivedNPCIds;
     if (currentWeek === 1) {
       const newArrivals = FTUE_ARRIVALS[nextDay] ?? [];
       if (newArrivals.length > 0) {
-        newArrivedNPCIds = [...state.arrivedNPCIds, ...newArrivals];
+        newArrivedNPCIds = [...gameStore.arrivedNPCIds, ...newArrivals];
+        gameStore.addArrivedNPCs(newArrivals);
       }
     }
 
@@ -678,9 +683,8 @@ export function useGameLoop() {
       activeEventId: null,
       droppedItems: [], // Clear leftover drops
       nightDropsOriginal: [],
-      arrivedNPCIds: newArrivedNPCIds,
     }));
-  }, [gameStore, playerStore, state.producerChoice, state.arrivedNPCIds, relStore]);
+  }, [gameStore, playerStore, state.producerChoice, relStore]);
 
   // Ceremony - player chooses partner
   const handleCeremonyChoice = useCallback((npcId: string) => {
@@ -778,6 +782,7 @@ export function useGameLoop() {
 
       // All NPCs now available for Week 2
       const allNPCIds = STARTING_CAST.filter(c => c.id !== 'player').map(c => c.id);
+      gameStore.setArrivedNPCIds(allNPCIds);
       const fullCast = STARTING_CAST.filter(c => c.id !== 'player');
       const events = generateDailyEvents(1, 2, fullCast, null, allNPCIds);
 
@@ -792,7 +797,6 @@ export function useGameLoop() {
         activeEventId: null,
         droppedItems: [],
         nightDropsOriginal: [],
-        arrivedNPCIds: allNPCIds,
         ceremonyPhase: 'choosing',
         ceremonyResults: [],
         eliminatedThisCeremony: [],
@@ -827,7 +831,6 @@ export function useGameLoop() {
       activeEventId: null,
       droppedItems: [],
       nightDropsOriginal: [],
-      arrivedNPCIds: [],
     }));
   }, [gameStore, relStore, playerStore, state.ceremonyPhase, state.eliminatedThisCeremony]);
 
@@ -864,6 +867,18 @@ export function useGameLoop() {
     }
   }, []);
 
+  // Locked structure popup — shown when player walks near a locked dock/cave
+  const handleLockedStructure = useCallback((key: string) => {
+    const msg = getStructureLockMessage(key);
+    const label = key === 'dock' ? 'Wooden Dock' : key === 'cave' ? 'Mysterious Cave' : 'Structure';
+    setState(s => ({
+      ...s,
+      showItemPopup: true,
+      itemPopupName: label,
+      itemPopupDesc: msg,
+    }));
+  }, []);
+
   // Dismiss item popup
   const dismissItemPopup = useCallback(() => {
     setState(s => ({ ...s, showItemPopup: false }));
@@ -890,6 +905,7 @@ export function useGameLoop() {
     handleProducerPhone,
     dismissItemPopup,
     handleBedInteract,
+    handleLockedStructure,
     // Item system
     openInventory,
     closeInventory,
