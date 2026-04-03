@@ -71,12 +71,13 @@ interface SpeciesConfig {
 }
 
 const SPECIES_CONFIGS: Record<string, SpeciesConfig> = {
-  rabbit: { bodyColor: "#F4A6C0", headColor: "#F4A6C0" }, // pink
-  fox: { bodyColor: "#E87A20", headColor: "#E87A20" }, // orange
-  bear: { bodyColor: "#8B5E3C", headColor: "#8B5E3C" }, // brown
-  cat: { bodyColor: "#2A2A2A", headColor: "#2A2A2A" }, // black
+  rabbit:  { bodyColor: "#F4A6C0", headColor: "#F4A6C0" }, // pink
+  fox:     { bodyColor: "#E87A20", headColor: "#E87A20" }, // orange
+  bear:    { bodyColor: "#8B5E3C", headColor: "#8B5E3C" }, // brown
+  cat:     { bodyColor: "#2A2A2A", headColor: "#2A2A2A" }, // black
   penguin: { bodyColor: "#1A1A1A", headColor: "#1A1A1A", secondaryColor: "#EEEEEE" }, // black/white
-  frog: { bodyColor: "#3CB043", headColor: "#3CB043" }, // green
+  frog:    { bodyColor: "#3CB043", headColor: "#3CB043" }, // green
+  dog:     { bodyColor: "#C8A050", headColor: "#C8A050" }, // golden tan (ferret-like)
 };
 
 // ---------------------------------------------------------------------------
@@ -96,12 +97,12 @@ function simpleHash(str: string): number {
 // NPCCharacter - reusable sub-component per species
 // ---------------------------------------------------------------------------
 
-interface NPCCharacterProps {
+export interface NPCCharacterProps {
   species: AnimalSpecies;
   bodyColor?: string;
 }
 
-function NPCCharacter({ species, bodyColor }: NPCCharacterProps) {
+export function NPCCharacter({ species, bodyColor }: NPCCharacterProps) {
   const config = SPECIES_CONFIGS[species] ?? SPECIES_CONFIGS.rabbit;
   const color = bodyColor ?? config.bodyColor;
 
@@ -127,6 +128,10 @@ function NPCCharacter({ species, bodyColor }: NPCCharacterProps) {
       const geo = new THREE.ConeGeometry(0.08, 0.2, 4);
       geo.translate(0, 0.1, 0);
       return geo;
+    }
+    if (species === "dog") {
+      // Floppy rounded ears (flattened sphere)
+      return null; // rendered separately as rounded flaps
     }
     return null;
   }, [species]);
@@ -251,6 +256,20 @@ function NPCCharacter({ species, bodyColor }: NPCCharacterProps) {
           <mesh position={[0.14, 1.22, 0.16]}>
             <sphereGeometry args={[0.05, 8, 8]} />
             <meshStandardMaterial color="#1A1A1A" />
+          </mesh>
+        </>
+      )}
+
+      {/* Dog: floppy ears hanging down the sides */}
+      {species === "dog" && (
+        <>
+          <mesh position={[-0.26, 1.0, 0]} rotation={[0, 0, 0.4]} scale={[0.09, 0.28, 0.07]}>
+            <sphereGeometry args={[1, 8, 6]} />
+            <meshStandardMaterial color={color} roughness={0.85} />
+          </mesh>
+          <mesh position={[0.26, 1.0, 0]} rotation={[0, 0, -0.4]} scale={[0.09, 0.28, 0.07]}>
+            <sphereGeometry args={[1, 8, 6]} />
+            <meshStandardMaterial color={color} roughness={0.85} />
           </mesh>
         </>
       )}

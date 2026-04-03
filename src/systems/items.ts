@@ -45,8 +45,8 @@ export const ITEM_DEFS: ItemDef[] = [
   {
     id: 'sunglasses',
     name: 'Sunglasses',
-    description: 'A stylish pair of sunglasses. Wear them to boost performance, or gift them.',
-    effect: 'performance_boost',
+    description: 'A stylish pair of sunglasses. Wear them to boost charm, or gift them.',
+    effect: 'charm_boost',
     effectValue: 10,
     spawnZones: ['Beach'],
     rarity: 'uncommon',

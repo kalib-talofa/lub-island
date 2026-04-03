@@ -4,6 +4,7 @@ import IsometricCamera from "@/scene/IsometricCamera";
 import DayNightCycle from "@/scene/DayNightCycle";
 import IslandEnvironment from "@/scene/IslandEnvironment";
 import RainSystem from "@/scene/RainSystem";
+import RaceField from "@/scene/RaceField";
 import VillaInterior from "@/scene/VillaInterior";
 import CaveInterior from "@/scene/CaveInterior";
 import DockInterior from "@/scene/DockInterior";
@@ -100,6 +101,7 @@ export default function Island({ onNPCInteract, onBedInteract, onLockedStructure
           {/* Outdoor island scene */}
           <DayNightCycle isNight={isNight} isRainy={isRainy} />
           <IslandEnvironment isNight={isNight} />
+          <RaceField />
           {isRainy && <RainSystem isNight={isNight} />}
           <PlayerController position={[0, 0, 6]} isMovementLocked={movementLocked} onLockedStructure={onLockedStructure} />
           <NPCController isNight={isNight} onNPCInteract={onNPCInteract} />

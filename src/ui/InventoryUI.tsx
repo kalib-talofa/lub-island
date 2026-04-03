@@ -35,7 +35,7 @@ function getUseLabel(item: ItemDef): string | null {
     case "flowers":       return null;
     case "chocolate":     return "Eat (+25 energy)";
     case "book":          return "Read (+15 perf)";
-    case "sunglasses":    return "Wear (+10 perf)";
+    case "sunglasses":    return "Wear (+10 charm)";
     case "producer_phone":return "Call Producer";
     default:
       if (item.id.startsWith("journal_")) return "Read Journal";

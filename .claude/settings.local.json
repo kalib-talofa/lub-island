@@ -28,7 +28,8 @@
       "Skill(update-docs)",
       "Skill(update-docs:*)",
       "Bash(/tmp/bug_analysis.txt:*)",
-      "Read(//tmp/**)"
+      "Read(//tmp/**)",
+      "Bash(xargs grep:*)"
     ]
   }
 }

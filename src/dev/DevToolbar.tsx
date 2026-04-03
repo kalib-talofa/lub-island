@@ -84,6 +84,8 @@ export default function DevToolbar() {
       },
     }, 'spawnAll').name('🏝️ Spawn All NPCs & Plots');
 
+    gameFolder.add({ teleport: () => { playerPositionRef.current.set(0, 0, 6); } }, 'teleport').name('📍 Teleport to Origin');
+
     const arrivalProxy = { arrived: useGameStore.getState().arrivedNPCIds.join(', ') || '(none)' };
     const arrivedCtrl = gameFolder.add(arrivalProxy, 'arrived').name('Arrived NPCs').disable();
 

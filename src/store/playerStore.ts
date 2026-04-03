@@ -9,8 +9,10 @@ interface PlayerStore {
   playerName: string;
   playerBio: string;
 
-  /** Performance buff from book/sunglasses — additive, resets each morning */
+  /** Performance buff from book — additive, resets each morning */
   performanceBoostToday: number;
+  /** Charm buff from sunglasses — additive, resets each morning */
+  charmBoostToday: number;
   /** NPC IDs whose journals have been read — unlocks special dialogue */
   unlockedJournals: string[];
 
@@ -24,6 +26,8 @@ interface PlayerStore {
   getGiftableItems: () => ItemDef[];
   /** Add a performance boost for the day */
   addPerformanceBoost: (amount: number) => void;
+  /** Add a charm boost for the day */
+  addCharmBoost: (amount: number) => void;
   /** Mark an NPC journal as read/unlocked */
   unlockJournal: (npcId: string) => void;
   /** Check if an NPC journal has been unlocked */
@@ -47,6 +51,7 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
   playerName: 'Player',
   playerBio: '',
   performanceBoostToday: 0,
+  charmBoostToday: 0,
   unlockedJournals: [],
 
   addItem: (item) => set((s) => ({ inventory: [...s.inventory, item] })),
@@ -85,6 +90,9 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
   addPerformanceBoost: (amount) =>
     set((s) => ({ performanceBoostToday: s.performanceBoostToday + amount })),
 
+  addCharmBoost: (amount) =>
+    set((s) => ({ charmBoostToday: s.charmBoostToday + amount })),
+
   unlockJournal: (npcId) =>
     set((s) => ({
       unlockedJournals: s.unlockedJournals.includes(npcId)
@@ -97,6 +105,7 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
   clearDayBuffs: () =>
     set((s) => ({
       performanceBoostToday: 0,
+      charmBoostToday: 0,
       // Remove journal items from inventory (they expire daily)
       inventory: s.inventory.filter(i => !i.id.startsWith('journal_')),
     })),
@@ -112,6 +121,7 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
     totalDatesCompleted: 0,
     playerBio: '',
     performanceBoostToday: 0,
+    charmBoostToday: 0,
     unlockedJournals: [],
   }),
 }));

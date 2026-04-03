@@ -11,7 +11,7 @@ import { canAfford } from '@/systems/energy';
 import { calculateNPCChoice } from '@/systems/relationships';
 import { getDialogueForNPC, getDramaDialogueForNPC, markDialogueSeen, resetSeenDialogues, advanceNPCDialogue, resetNPCDialogueProgress } from '@/characters/dialogueScripts';
 import { DialogueRunner, DialogueLine } from '@/utils/ink';
-import { ENERGY_COSTS, PROD_ENERGY, FTUE_ARRIVALS, UNLOCKABLE_STRUCTURES, getDaysInWeek } from '@/game/constants';
+import { ENERGY_COSTS, PROD_ENERGY, FTUE_ARRIVALS, UNLOCKABLE_STRUCTURES, getDaysInWeek, EGG_RACE } from '@/game/constants';
 import { cameraPanTargetRef } from '@/scene/IsometricCamera';
 import { isCeremonyDay, isFreeRoamDay } from '@/systems/calendar';
 import { getStructureLockMessage, isStructureUnlocked } from '@/game/unlocks';
@@ -62,6 +62,10 @@ export interface GameLoopState {
   eliminatedThisCeremony: string[];
 
   // Challenge
+  showPartnerSelect: boolean;
+  challengePartnerOptions: { id: string; name: string; relationship: number }[];
+  challengeOtherPairs: { npcA: string; npcB: string }[];
+  challengeRelationship: number;
   challengeNPCId: string;
   challengeNPCName: string;
 
@@ -124,6 +128,10 @@ export function useGameLoop() {
     ceremonyPhase: 'choosing',
     ceremonyResults: [],
     eliminatedThisCeremony: [],
+    showPartnerSelect: false,
+    challengePartnerOptions: [],
+    challengeOtherPairs: [],
+    challengeRelationship: 0,
     challengeNPCId: '',
     challengeNPCName: '',
     dateNPCId: '',
@@ -190,13 +198,13 @@ export function useGameLoop() {
       }
       case 'sunglasses': {
         playerStore.removeItem(item.id);
-        playerStore.addPerformanceBoost(10);
+        playerStore.addCharmBoost(10);
         setState(s => ({
           ...s,
           showInventory: false,
           showItemPopup: true,
           itemPopupName: 'Looking Cool!',
-          itemPopupDesc: 'Wearing sunglasses boosted your performance by 10 for today.',
+          itemPopupDesc: 'Wearing sunglasses boosted your charm by 10 for today.',
         }));
         break;
       }
@@ -373,10 +381,10 @@ export function useGameLoop() {
     const script = getDialogueForNPC(npcId, relationship, gameStore.totalDaysPlayed, gameStore.isRainy);
 
     const runner = new DialogueRunner(script, {
-      charm: bio.charm,
+      charm: bio.charm + playerStore.charmBoostToday,
       energy: bio.energy,
       performance: bio.performance + playerStore.performanceBoostToday,
-      player_charm: bio.charm,
+      player_charm: bio.charm + playerStore.charmBoostToday,
       player_energy: bio.energy,
       player_performance: bio.performance + playerStore.performanceBoostToday,
       relationship_level: relationship,
@@ -529,12 +537,15 @@ export function useGameLoop() {
     setState(s => ({ ...s, currentEvent: event, showEventScreen: false }));
 
     if (event.type === 'challenge') {
-      const partner = activeCast[Math.floor(Math.random() * activeCast.length)];
+      const options = activeCast.map(c => ({
+        id: c.id,
+        name: c.name,
+        relationship: relStore.getRelationship(c.id),
+      }));
       setState(s => ({
         ...s,
-        showChallengeUI: true,
-        challengeNPCId: partner?.id ?? '',
-        challengeNPCName: partner?.name ?? '',
+        showPartnerSelect: true,
+        challengePartnerOptions: options,
       }));
     } else if (event.type === 'date') {
       const npc = activeCast.find(c => event.involvedNPCs.includes(c.id));
@@ -567,10 +578,10 @@ export function useGameLoop() {
           const relationship = relStore.getRelationship(npc.id);
           const script = getDramaDialogueForNPC(npc.id, relationship, gameStore.totalDaysPlayed, gameStore.isRainy);
           const runner = new DialogueRunner(script, {
-            charm: bio.charm,
+            charm: bio.charm + playerStore.charmBoostToday,
             energy: bio.energy,
             performance: bio.performance + playerStore.performanceBoostToday,
-            player_charm: bio.charm,
+            player_charm: bio.charm + playerStore.charmBoostToday,
             player_energy: bio.energy,
             player_performance: bio.performance + playerStore.performanceBoostToday,
             relationship_level: relationship,
@@ -596,6 +607,37 @@ export function useGameLoop() {
     }
   }, [bio, gameStore, activeCast, handleNPCInteract, relStore, playerStore]);
 
+  // Partner selected for egg race — auto-pair remaining NPCs, teleport, start challenge
+  const handlePartnerSelected = useCallback((npcId: string) => {
+    const npc = STARTING_CAST.find(c => c.id === npcId);
+    const relationship = relStore.getRelationship(npcId);
+
+    // Shuffle remaining active cast into pairs
+    const remaining = activeCast.filter(c => c.id !== npcId);
+    const shuffled = [...remaining].sort(() => Math.random() - 0.5);
+    const pairs: { npcA: string; npcB: string }[] = [];
+    for (let i = 0; i + 1 < shuffled.length; i += 2) {
+      pairs.push({ npcA: shuffled[i].id, npcB: shuffled[i + 1].id });
+    }
+
+    // Teleport player to spectator viewpoint
+    playerPositionRef.current.set(
+      EGG_RACE.SPECTATOR_POS[0],
+      EGG_RACE.SPECTATOR_POS[1],
+      EGG_RACE.SPECTATOR_POS[2],
+    );
+
+    setState(s => ({
+      ...s,
+      showPartnerSelect: false,
+      showChallengeUI: true,
+      challengeNPCId: npcId,
+      challengeNPCName: npc?.name ?? '',
+      challengeOtherPairs: pairs,
+      challengeRelationship: relationship,
+    }));
+  }, [activeCast, relStore]);
+
   // Show event screen for an event from the daily pool
   const triggerEvent = useCallback((eventIndex: number) => {
     const event = state.dailyEvents[eventIndex];
@@ -611,6 +653,14 @@ export function useGameLoop() {
   // Challenge complete
   const handleChallengeComplete = useCallback((score: number, tier: string) => {
     const delta = getRelationshipReward(tier as 'bronze' | 'silver' | 'gold');
+
+    // Teleport player back to island
+    playerPositionRef.current.set(
+      EGG_RACE.RETURN_POS[0],
+      EGG_RACE.RETURN_POS[1],
+      EGG_RACE.RETURN_POS[2],
+    );
+
     setState(s => {
       if (s.challengeNPCId) {
         queueMicrotask(() => relStore.changeRelationship(s.challengeNPCId, delta));
@@ -618,7 +668,14 @@ export function useGameLoop() {
       const newCompleted = s.currentEvent
         ? [...s.completedEventIds, s.currentEvent.id]
         : s.completedEventIds;
-      return { ...s, showChallengeUI: false, currentEvent: null, completedEventIds: newCompleted };
+      return {
+        ...s,
+        showChallengeUI: false,
+        currentEvent: null,
+        completedEventIds: newCompleted,
+        challengeOtherPairs: [],
+        challengeRelationship: 0,
+      };
     });
     if (tier === 'gold') playerStore.incrementChallengesWon();
     gameStore.completeEvent();
@@ -964,6 +1021,7 @@ export function useGameLoop() {
     triggerEvent,
     handleStartEvent,
     closeEventScreen,
+    handlePartnerSelected,
     handleChallengeComplete,
     handleDateComplete,
     goToSleep,

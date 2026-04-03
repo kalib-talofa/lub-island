@@ -3,7 +3,7 @@
 // ---------------------------------------------------------------------------
 // Set to true before sending to testers: hides dev tools, disables energy
 // costs so players are never blocked by low energy stats.
-export const PROD_ENERGY = false;
+export const PROD_ENERGY = true;
 
 // Energy costs
 export const ENERGY_COSTS = {
@@ -187,11 +187,11 @@ export const EGG_RACE = {
   GOLD_EGGS: 5,
   SILVER_EGGS: 3,
   // 3-D world positions
-  FIELD_Z: -56,           // field center Z
-  FIELD_HALF_X: 10,       // characters run from -10 to +10 in world X
-  LANE_SPACING: 2.5,      // Z separation between lanes (local to field group)
-  SPECTATOR_POS: [0, 0, -49] as [number, number, number],
-  RETURN_POS:    [-28, 0, 2] as [number, number, number],
+  FIELD_Z: -56,            // field center Z
+  FIELD_HALF_X: 5,         // characters run from -5 to +5 in world X (fits camera)
+  LANE_SPACING: 1.5,       // Z separation between lanes (local to field group)
+  SPECTATOR_POS: [-5, 0, -53.5] as [number, number, number],  // lane-0 left start
+  RETURN_POS:    [0, 0, 6] as [number, number, number],
 } as const;
 
 // ---------------------------------------------------------------------------

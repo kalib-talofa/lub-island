@@ -18,6 +18,12 @@ import { isZoneUnlocked, isStructureUnlocked } from "@/game/unlocks";
 // ---------------------------------------------------------------------------
 
 export const playerPositionRef = { current: new THREE.Vector3(0, 0, 0) };
+/** Set to true by ChallengeUI during the egg race so FerretCharacter plays run anim. */
+export const playerRaceRunningRef: { current: boolean } = { current: false };
+/** Race facing angle — written by ChallengeUI so the player faces the correct direction. */
+export const playerRaceFacingRef: { current: number } = { current: Math.PI / 2 };
+/** Whether to show an egg on the player during the race. */
+export const playerRaceEggRef: { current: boolean } = { current: false };
 export const playerTargetRef = { current: new THREE.Vector3(0, 0, 0) };
 export const joystickInputRef = {
   current: { x: 0, y: 0, active: false },
@@ -683,6 +689,11 @@ export default function PlayerController({
       isMoving.current = false;
     }
 
+    // During egg race, override facing direction
+    if (playerRaceRunningRef.current) {
+      currentRotation.current = playerRaceFacingRef.current;
+    }
+
     // ---- walk bob ---------------------------------------------------------
     if (isMoving.current) {
       bobPhase.current += delta * BOB_SPEED;
@@ -720,7 +731,27 @@ export default function PlayerController({
       <Suspense fallback={null}>
         <FerretCharacter isMoving={isMoving} />
       </Suspense>
+      {/* Egg carried during egg spoon race */}
+      <RaceEgg />
     </group>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Race egg — shown on the player during the egg spoon race
+// ---------------------------------------------------------------------------
+
+function RaceEgg() {
+  const meshRef = useRef<THREE.Mesh>(null);
+  useFrame(() => {
+    if (!meshRef.current) return;
+    meshRef.current.visible = playerRaceEggRef.current;
+  });
+  return (
+    <mesh ref={meshRef} position={[0.3, 0.8, 0]} visible={false}>
+      <sphereGeometry args={[0.1, 7, 5]} />
+      <meshLambertMaterial color="#fffde7" />
+    </mesh>
   );
 }
 
@@ -872,7 +903,7 @@ function FerretCharacter({ isMoving }: { isMoving: React.MutableRefObject<boolea
       probeResult.current = result;
     }
 
-    const walking = isMoving.current;
+    const walking = isMoving.current || playerRaceRunningRef.current;
     const speed = walking ? 8 : 2.5;
     animPhase.current += delta * speed;
     const t = animPhase.current;

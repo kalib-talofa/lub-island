@@ -16,6 +16,7 @@ import MainMenu from '@/ui/MainMenu';
 import MorningBriefing from '@/ui/MorningBriefing';
 import EventScreen from '@/ui/EventScreen';
 import ChallengeUI from '@/ui/ChallengeUI';
+import PartnerSelectUI from '@/ui/PartnerSelectUI';
 import DateUI from '@/ui/DateUI';
 import CeremonyUI from '@/ui/CeremonyUI';
 import SleepTransition from '@/ui/SleepTransition';
@@ -52,6 +53,7 @@ export default function Game() {
     triggerEvent,
     handleStartEvent,
     closeEventScreen,
+    handlePartnerSelected,
     handleChallengeComplete,
     handleDateComplete,
     goToSleep,
@@ -521,14 +523,25 @@ export default function Game() {
           </div>
         )}
 
-        {/* Challenge UI */}
+        {/* Partner Select (before egg race) */}
+        {state.showPartnerSelect && (
+          <div style={{ pointerEvents: 'auto' }}>
+            <PartnerSelectUI
+              options={state.challengePartnerOptions}
+              onSelect={handlePartnerSelected}
+            />
+          </div>
+        )}
+
+        {/* Challenge UI — Egg Spoon Race */}
         {state.showChallengeUI && (
           <div style={{ pointerEvents: 'auto' }}>
             <ChallengeUI
-              performance={bio.performance}
-              onComplete={handleChallengeComplete}
               partnerNPCId={state.challengeNPCId}
               partnerNPCName={state.challengeNPCName}
+              relationship={state.challengeRelationship}
+              otherPairs={state.challengeOtherPairs}
+              onComplete={handleChallengeComplete}
             />
           </div>
         )}

@@ -15,7 +15,7 @@ interface HUDProps {
 export default function HUD({ onOpenInventory, onStatsTap }: HUDProps) {
   const { day, week, isNight, eventsCompleted, phase } = useGameStore();
   const { energy, charm, performance } = useBiometricStore();
-  const { inventory, performanceBoostToday } = usePlayerStore();
+  const { inventory, performanceBoostToday, charmBoostToday } = usePlayerStore();
 
   const [muted, setMuted] = useState(audioManager.isMuted());
 
@@ -25,6 +25,7 @@ export default function HUD({ onOpenInventory, onStatsTap }: HUDProps) {
   const totalEvents = EVENTS_PER_DAY;
   const itemCount = inventory.length;
   const displayPerf = Math.round(performance + performanceBoostToday);
+  const displayCharm = Math.round(charm + charmBoostToday);
 
   return (
     <div className="pointer-events-none fixed inset-x-0 top-0 z-50 flex flex-col gap-1.5 px-6 py-3">
@@ -66,7 +67,10 @@ export default function HUD({ onOpenInventory, onStatsTap }: HUDProps) {
             {"\u{1F4AC}"}
           </span>
           <span className="text-xs font-semibold text-pink-300">
-            {Math.round(charm)}
+            {displayCharm}
+            {charmBoostToday > 0 && (
+              <span className="text-emerald-400"> +{charmBoostToday}</span>
+            )}
           </span>
         </div>
 
