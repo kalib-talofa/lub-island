@@ -163,7 +163,7 @@ A debug toggle (`setGodMode(true)`) sets all three stats to 100 regardless of bi
 
 - **Energy:** Spent on all daytime actions. Determines how much the player can do each day.
 - **Charm:** Gates dialogue choices. Higher charm unlocks smoother/flirtier responses. See Dialogue System.
-- **Performance:** Affects challenge mini-games. Higher performance = easier Coconut Catch (slower fall speed, wider catch radius).
+- **Performance:** Affects challenge mini-games. Higher performance stat is available to dialogue conditions but the Egg Spoon Race uses relationship-based drop chance, not the performance stat directly.
 
 ---
 
@@ -173,7 +173,7 @@ A debug toggle (`setGodMode(true)`) sets all three stats to 100 regardless of bi
 
 | Action | Cost | Notes |
 |---|---|---|
-| Challenge Event | 25 | Coconut Catch or similar |
+| Challenge Event | 25 | Egg Spoon Race |
 | Date Event | 20 | One-on-one date sequence |
 | Social Event | 15 | Group dialogue |
 | Talk to NPC (daytime) | 5 | Initiates dialogue |
@@ -413,35 +413,44 @@ When the player has read an NPC's character journal, a `journal_unlocked` variab
 
 ## 10. Events
 
-### 10a. Coconut Catch Challenge
+### 10a. Egg Spoon Race Challenge
 
-The primary challenge mini-game. A 2D catch game where coconuts fall from the top of the screen and the player moves a basket to catch them.
+The primary challenge mini-game. A 3D relay race on a dedicated race field off the main island (`FIELD_Z = -56`). Before the race starts, the player selects a partner from the active cast via `PartnerSelectUI`. Remaining NPCs are auto-paired (odd one sits out). The player is teleported to the race field start (`SPECTATOR_POS = [-5, 0, -53.5]`); after the race they return to `RETURN_POS = [0, 0, 6]`.
 
-At the start of the challenge, one **random NPC partner** is assigned. Performance affects the relationship with that partner only (not all watching NPCs). The partner is displayed prominently during gameplay as a large emoji with a name banner below the HUD. The relationship delta is shown on the results screen. The EventScreen preview for challenge events shows a "Partner Challenge" notice explaining the partner mechanic.
+**Race flow:**
+1. **Partner Select:** Full-screen UI shows NPC cards with emoji, name, and current relationship score.
+2. **Countdown:** 3-2-1 overlay.
+3. **Playing:** Transparent overlay over the 3D race. Two intent buttons appear: **"Do Your Best"** (normal drop chance based on relationship) or **"Sabotage"** (guaranteed drop, `1.0`).
+4. **Results:** Shows eggs delivered, tier, and relationship delta.
 
-**Parameters (from `COCONUT_CATCH`):**
+A single `requestAnimationFrame` loop in `ChallengeUI` drives all simulation via refs, writing to `raceSimRef` (per-frame animation state) and moving `playerPositionRef` so the Ferret model runs on the field. `RaceField.tsx` (always rendered in the outdoor scene) reads `raceSimRef` and `raceDefsRef` each frame.
+
+**Parameters (from `EGG_RACE`):**
 
 | Parameter | Value | Description |
 |---|---|---|
-| Duration | 10 seconds | `DURATION_SECONDS` (demo build) |
-| Base fall speed | 3 | `BASE_FALL_SPEED` (units per frame) |
-| Performance speed modifier | 0.02 | `PERFORMANCE_SPEED_MODIFIER` -- per point of Performance, fall speed decreases |
-| Base catch radius | 40px | `BASE_CATCH_RADIUS` |
-| Performance radius modifier | 0.3 | `PERFORMANCE_RADIUS_MODIFIER` -- per point of Performance, radius grows |
-| Spawn interval | 800ms | `SPAWN_INTERVAL_MS` |
-| Minimum fall speed | 0.5 | Hard floor to prevent negative/zero speed |
+| Total rounds | 5 | `TOTAL_ROUNDS` -- legs in the race |
+| Field half-X | 5 | `FIELD_HALF_X` -- characters run from -5 to +5 world X |
+| Lane spacing | 1.5 | `LANE_SPACING` -- Z separation between racer lanes |
+| Field Z | -56 | `FIELD_Z` -- race arena world Z position |
+| Player drop base | 0.45 | `PLAYER_DROP_BASE` -- drop chance at 0 relationship ("Do Your Best") |
+| Player drop factor | 0.004 | `PLAYER_DROP_FACTOR` -- reduction per relationship point |
+| Player drop min | 0.05 | `PLAYER_DROP_MIN` -- floor drop chance |
+| Partner drop base | 0.28 | `PARTNER_DROP_BASE` |
+| Partner drop factor | 0.002 | `PARTNER_DROP_FACTOR` |
+| Partner drop min | 0.05 | `PARTNER_DROP_MIN` |
 
-**Effective values with Performance stat:**
-- Fall speed = `max(0.5, 3 - performance * 0.02)` -- At 100 performance: `max(0.5, 1.0)` = 1.0
-- Catch radius = `40 + performance * 0.3` -- At 100 performance: 70px
+**Drop chance helpers (from `src/systems/challenge.ts`):**
+- `getPlayerDropChance(relationship, intent)` -- `intent = 'sabotage'` returns `1.0`; `'best'` uses: `max(MIN, BASE - rel * FACTOR)`
+- `getPartnerDropChance(relationship)` -- uses: `max(MIN, BASE - rel * FACTOR)`
 
-**Scoring Tiers:**
+**Scoring Tiers (score = eggs delivered without drop):**
 
-| Tier | Coconuts Caught | Relationship Reward (to challenge partner only) |
+| Tier | Eggs Delivered | Relationship Reward (to race partner only) |
 |---|---|---|
-| Bronze | 5+ (`BRONZE_THRESHOLD`) | -10 (`CHALLENGE_BRONZE`, penalty) |
-| Silver | 10+ (`SILVER_THRESHOLD`) | +8 (`CHALLENGE_SILVER`) |
-| Gold | 15+ (`GOLD_THRESHOLD`) | +15 (`CHALLENGE_GOLD`) |
+| Bronze | < 3 (`SILVER_EGGS`) | -10 (`CHALLENGE_BRONZE`, penalty) |
+| Silver | 3-4 | +8 (`CHALLENGE_SILVER`) |
+| Gold | 5 (`GOLD_EGGS` = all rounds) | +15 (`CHALLENGE_GOLD`) |
 
 Gold tier also increments the player's `challengesWon` counter.
 
@@ -633,7 +642,31 @@ The deterministic hash (`simpleHash`) ensures consistent behavior per NPC -- the
 
 ---
 
-## 14. Camera System
+## 14. Rainy Day System
+
+Certain days are designated as rainy. The schedule is defined in `RAINY_DAYS` (a `readonly` array of `{ week, day }` pairs):
+
+| Week | Day |
+|---|---|
+| 1 | 2 |
+| 2 | 2 |
+
+**How it works:**
+- `isRainyDay(week, day)` (from `src/game/constants.ts`) checks the schedule.
+- `isRainy` is a field on `gameStore`. It is auto-set to `true` or `false` inside `advanceDay()` and on week transitions.
+- `setRainy(v)` is also available for manual override (used by the dev toolbar).
+
+**Visual effects (when `isRainy = true`):**
+- `DayNightCycle` receives an `isRainy` prop and switches to overcast lighting.
+- `RainSystem.tsx` (rendered inside `Island.tsx`) renders falling rain particles.
+
+**Dialogue:** NPCs have rain-specific fallback dialogue lines. The dialogue system checks `isRainy` and selects rain lines when available.
+
+**Dev toolbar:** A "Weather" folder in `DevToolbar.tsx` shows the current rain state (read-only display) and two buttons: "Start Rainy Day" and "Clear Rain".
+
+---
+
+## 15. Camera System
 
 The game uses an isometric-style camera:
 
@@ -650,7 +683,7 @@ The camera angle is controlled by a 0-100 slider (`cameraAngleRef`), defaulting 
 
 ---
 
-## 15. Player Movement
+## 16. Player Movement
 
 | Parameter | Value |
 |---|---|
@@ -660,7 +693,7 @@ The camera angle is controlled by a 0-100 slider (`cameraAngleRef`), defaulting 
 
 ---
 
-## 16. Future Features (Not Yet Implemented)
+## 17. Future Features (Not Yet Implemented)
 
 The following features are referenced in the design or partially stubbed but not fully implemented:
 

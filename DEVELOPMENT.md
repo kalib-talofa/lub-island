@@ -49,6 +49,7 @@ The dev toolbar is a `lil-gui` panel rendered by `src/dev/DevToolbar.tsx`. It oc
   - **Character Journals** subfolder: buttons to add each NPC's journal.
   - **Clear Inventory** button to empty the bag.
   - **Items in Bag** count display (auto-refreshes).
+- **Weather** -- Shows current rain state (read-only). Buttons: "Start Rainy Day" (calls `setRainy(true)`) and "Clear Rain" (calls `setRainy(false)`).
 - **Night Drops** -- Read-only display showing player X/Z coordinates and up to 4 spawned night item locations (name + coordinates or 'Villa (indoors)'). Updates every 500ms.
 
 ### WASD Keyboard Movement
@@ -327,7 +328,8 @@ const energy = useBiometricStore(s => s.energy);
 
 Never call a store hook with no selector (`useBiometricStore()`) -- it re-renders on every state change.
 
-- **Module-level refs** (`playerPositionRef`, `joystickInputRef`) bypass React's reconciliation. Use them for data that changes every frame (positions, velocities, input state).
+- **Module-level refs** (`playerPositionRef`, `joystickInputRef`, `raceSimRef`, `raceDefsRef`, `playerRaceRunningRef`) bypass React's reconciliation. Use them for data that changes every frame (positions, velocities, input state, race animation).
+- **Race simulation** in `ChallengeUI` uses a single `requestAnimationFrame` loop (not `useFrame`) to drive all racer state via `raceSimRef`. `RaceField` reads this ref in `useFrame` each tick. Do not add React state inside the race loop -- it will cause unnecessary re-renders.
 - **Dev toolbar** polls store state on a 500ms interval. This is fine for development but the toolbar should not ship in production.
 
 ---
@@ -370,9 +372,13 @@ src/
 | `src/characters/dialogueScripts.ts` | Dialogue trees + daily dialogue progression logic |
 | `src/characters/daily/`           | Per-NPC daily dialogue scripts (126 total)       |
 | `src/characters/CharacterData.ts` | Type definitions for Character, GameEvent, etc.  |
-| `src/scene/PlayerController.tsx`  | Player movement, WASD input, structure colliders |
-| `src/scene/NPCController.tsx`     | NPC positioning and zone offsets                 |
+| `src/scene/PlayerController.tsx`  | Player movement, WASD input, structure colliders, `playerRaceRunningRef` |
+| `src/scene/NPCController.tsx`     | NPC positioning, zone offsets, exports `NPCCharacter` + `NPCCharacterProps` |
 | `src/scene/IslandEnvironment.tsx` | Island geometry and ZONE_POSITIONS               |
+| `src/scene/RaceField.tsx`         | 3D race arena; exports `raceSimRef`, `raceDefsRef` |
+| `src/scene/RainSystem.tsx`        | Rain particle system (rendered when `isRainy=true`) |
+| `src/game/unlocks.ts`             | `isZoneUnlocked()`, `isStructureUnlocked()` helpers |
+| `src/ui/PartnerSelectUI.tsx`      | Pre-race partner selection UI                    |
 | `src/systems/items.ts`            | Item definitions (ITEM_DEFS)                     |
 | `src/systems/events.ts`           | Event generation logic (FTUE + Week 2+)          |
 | `src/systems/calendar.ts`         | Week-aware day types, ceremony/free day checks   |

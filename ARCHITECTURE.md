@@ -44,15 +44,19 @@ src/
   game/
     Game.tsx                    -- Top-level component: R3F <Canvas> + UI overlay div
     GameLoop.tsx                -- useGameLoop() hook: all phase/event/dialogue state machine logic
-    constants.ts                -- All tuning constants (energy costs, camera params, coconut catch, etc.)
+    constants.ts                -- All tuning constants (energy costs, camera params, egg race, rainy days, unlocks, etc.)
+    unlocks.ts                  -- isZoneUnlocked() and isStructureUnlocked() helpers; reads NPC_ZONE_UNLOCKS / UNLOCKABLE_STRUCTURES from constants
 
   scene/
-    Island.tsx                  -- Root R3F scene: assembles camera, lighting, environment, player, NPCs
+    Island.tsx                  -- Root R3F scene: assembles camera, lighting, environment, player, NPCs, RaceField, RainSystem
     IsometricCamera.tsx         -- Orthographic camera that lerps to follow player position
     DayNightCycle.tsx           -- Ambient/directional/hemisphere/point lights + Stars; lerps between day/night
     IslandEnvironment.tsx       -- All static geometry (ground, water, zones, buildings, trees, props). Exports ZONE_POSITIONS.
-    PlayerController.tsx        -- Player movement, collision, rendering. Exports module-level refs.
-    NPCController.tsx           -- Renders all active NPCs with idle animation, facing, interaction proximity
+    PlayerController.tsx        -- Player movement, collision, rendering. Exports module-level refs including playerRaceRunningRef.
+    NPCController.tsx           -- Renders all active NPCs with idle animation, facing, interaction proximity. Exports NPCCharacter + NPCCharacterProps.
+    RaceField.tsx               -- 3D race arena at FIELD_Z=-56. Always rendered (outdoor scene). Exports raceSimRef, raceDefsRef, RacerState, RacerDef.
+    RainSystem.tsx              -- Falling rain particle system; rendered by Island.tsx when isRainy=true.
+    CaveInterior.tsx            -- Rocky underground chamber scene for the cave interior location.
     ItemPickups.tsx               -- 3D item pickup objects (dodecahedron + glow + auto-collect)
     InteractionZone.tsx         -- (Unused / minimal -- interaction handled inside NPCController)
 
@@ -75,7 +79,7 @@ src/
     energy.ts                   -- canAfford(), spendEnergy(), getEnergyCostForAction(), getEnergyWarning()
     calendar.ts                 -- getDayType(), isCeremonyDay(), isFreeRoamDay(), getAvailableEventTypes(), getDayLabel()
     events.ts                   -- generateDailyEvents(): builds EVENTS_PER_DAY GameEvent objects per day (FTUE baked events for Week 1, normal generation for Week 2+)
-    challenge.ts                -- Coconut Catch helpers: getCoconutFallSpeed(), getCatchRadius(), getScoreTier(), getRelationshipReward()
+    challenge.ts                -- Egg Spoon Race helpers: getEggRaceTier(eggsDelivered), getPlayerDropChance(rel, intent), getPartnerDropChance(rel)
     relationships.ts            -- getRelationshipTier(), getRelationshipLabel(), calculateNPCChoice()
     biometrics.ts               -- Biometric computation helpers
     items.ts                    -- Item system helpers
@@ -87,7 +91,8 @@ src/
     MainMenu.tsx                -- Start screen
     MorningBriefing.tsx         -- Day-start summary overlay
     EventScreen.tsx             -- Event preview (title, description, energy cost, start/close)
-    ChallengeUI.tsx             -- Coconut Catch mini-game; displays random NPC partner banner during play and relationship delta on results screen
+    ChallengeUI.tsx             -- Egg Spoon Race mini-game. Phases: countdown → playing (intent buttons) → results. Single rAF loop drives simulation via raceSimRef / playerPositionRef.
+    PartnerSelectUI.tsx         -- Full-screen partner selection before the race; shows NPC cards with emoji, name, relationship score.
     DateUI.tsx                  -- Date sequence UI
     CeremonyUI.tsx              -- Partner choosing + results + departure + demo end + ftue_complete phases
     StatBreakdown.tsx           -- Shared stat breakdown popup (used in MorningBriefing and HUD)
@@ -142,18 +147,28 @@ interface GameStore {
   eventsRemaining: number;   // 0 to EVENTS_PER_DAY (3)
   eventsCompleted: number;
   isNight: boolean;
+  isRainy: boolean;
   isIndoors: boolean;
+  indoorLocation: 'villa' | 'cave' | 'dock' | null;
   currentEventType: EventType | null;
+  arrivedNPCIds: string[];               // FTUE progressive arrivals (Week 1)
 
   setPhase(phase: GamePhase): void;
   startEvent(type: EventType): void;      // sets phase='EVENT', stores type
   completeEvent(): void;                  // decrements eventsRemaining; returns to DAYTIME_FREE
   transitionToNight(): void;              // phase='NIGHTTIME_FREE', isNight=true, eventsRemaining=0
-  advanceDay(): void;                     // increments day (wraps at getDaysInWeek(week) -> week+1), resets events, phase='MORNING_BRIEFING'
+  advanceDay(): void;                     // increments day (wraps at getDaysInWeek(week) -> week+1), resets events, auto-sets isRainy, phase='MORNING_BRIEFING'
   advanceToNight(): void;
   advanceToCeremony(): void;              // sets day to getDaysInWeek(week), phase='CEREMONY'
   enterVilla(): void;
   exitVilla(): void;
+  enterCave(): void;
+  exitCave(): void;
+  enterDock(): void;
+  exitDock(): void;
+  setRainy(v: boolean): void;
+  setArrivedNPCIds(ids: string[]): void;
+  addArrivedNPCIds(ids: string[]): void;
   resetWeek(): void;
   resetGame(): void;
 }
@@ -238,10 +253,12 @@ interface RelationshipStore {
 ```
 <Island onNPCInteract={handleNPCInteract}>
   <IsometricCamera />               -- Follows player via lerp; orthographic
-  <DayNightCycle isNight={isNight} />  -- All lighting + stars
+  <DayNightCycle isNight={isNight} isRainy={isRainy} />  -- All lighting + stars; overcast when rainy
   <IslandEnvironment isNight={isNight} />  -- Static world geometry
   <PlayerController position={[0,0,5]} isMovementLocked={movementLocked} />
   <NPCController isNight={isNight} onNPCInteract={onNPCInteract} />
+  <RaceField />                     -- Race arena at FIELD_Z=-56; always rendered (reads raceSimRef/raceDefsRef)
+  {isRainy && <RainSystem isNight={isNight} />}  -- Falling rain particles
 ```
 
 ### Camera (`IsometricCamera.tsx`)
@@ -397,6 +414,7 @@ Species-specific geometry configs in `SPECIES_CONFIGS`:
 - `cat` -- black (#2A2A2A), pointed small ears
 - `penguin` -- black with white belly cylinder, flattened box wings
 - `frog` -- green, large white sphere eyes with black pupils
+- `dog` -- golden tan (#C8A050), floppy ears hanging down the sides (cylinder geometry)
 
 All NPCs share the same body structure: cylinder body, sphere head, species-specific features.
 
@@ -513,6 +531,10 @@ interface GameLoopState {
   showMorningBriefing: boolean;
   showMainMenu: boolean;
   showProducerPhone: boolean;
+  showPartnerSelect: boolean;
+  challengePartnerOptions: { id: string; name: string; relationship: number }[];
+  challengeOtherPairs: { npcA: string; npcB: string }[];
+  challengeRelationship: number;
   showItemPopup: boolean;
   showInventory: boolean;
   itemPopupName: string;
@@ -547,7 +569,7 @@ MAIN_MENU
      -> continueMorning() -> DAYTIME_FREE
         -> triggerEvent(i) -> shows EventScreen
            -> handleStartEvent(event) -> EVENT
-              challenge -> showChallengeUI -> handleChallengeComplete() -> DAYTIME_FREE
+              challenge -> showPartnerSelect -> handlePartnerSelected(npcId) -> showChallengeUI -> handleChallengeComplete() -> DAYTIME_FREE
               date -> showDateUI -> handleDateComplete() -> DAYTIME_FREE
               social/arrival -> starts NPC dialogue -> resolveDialogueEventCompletion() marks event done
               drama -> starts drama dialogue -> resolveDialogueEventCompletion()
@@ -587,9 +609,12 @@ Defined in `PlayerController.tsx` and imported by other modules:
 
 | Ref | Type | Writers | Readers |
 |---|---|---|---|
-| `playerPositionRef` | `{ current: Vector3 }` | `PlayerController` (useFrame) | `IsometricCamera`, `NPCController` (proximity checks) |
+| `playerPositionRef` | `{ current: Vector3 }` | `PlayerController` (useFrame), `ChallengeUI` (race teleport) | `IsometricCamera`, `NPCController` (proximity checks), `RaceField` |
 | `playerTargetRef` | `{ current: Vector3 }` | `PlayerController` (useFrame) | (currently copies playerPositionRef) |
 | `joystickInputRef` | `{ current: { x, y, active } }` | `VirtualJoystick` (touch/mouse handlers) | `PlayerController` (useFrame, merged with WASD) |
+| `playerRaceRunningRef` | `{ current: boolean }` | `ChallengeUI` (race active) | `PlayerController` (triggers Ferret run animation) |
+| `raceSimRef` | `{ current: RacerState[] }` | `ChallengeUI` (rAF loop) | `RaceField` (useFrame, positions racer models) |
+| `raceDefsRef` | `{ current: RacerDef[] }` | `ChallengeUI` (race start, once) | `RaceField` (loads species/color configs for racer models) |
 
 ### Store access patterns
 
@@ -608,7 +633,7 @@ Defined in `PlayerController.tsx` and imported by other modules:
 
 ### Energy / prod mode
 ```ts
-PROD_ENERGY = false  // When true, all energy costs are bypassed (tester mode)
+PROD_ENERGY = true   // When true, all energy costs are bypassed (tester mode)
 
 ENERGY_COSTS = {
   CHALLENGE_EVENT: 25,
@@ -660,19 +685,35 @@ PLAYER = {
 }
 ```
 
-### Coconut Catch (challenge mini-game)
+### Egg Spoon Race (challenge mini-game)
 ```ts
-COCONUT_CATCH = {
-  DURATION_SECONDS: 10,
-  BRONZE_THRESHOLD: 5,
-  SILVER_THRESHOLD: 10,
-  GOLD_THRESHOLD: 15,
-  BASE_FALL_SPEED: 3,
-  PERFORMANCE_SPEED_MODIFIER: 0.02,  // lower speed per performance point
-  BASE_CATCH_RADIUS: 40,
-  PERFORMANCE_RADIUS_MODIFIER: 0.3,  // extra radius per performance point
-  SPAWN_INTERVAL_MS: 800,
+EGG_RACE = {
+  TOTAL_ROUNDS: 5,
+  RUN_MIN: 2.0,           // seconds per leg (min)
+  RUN_MAX: 3.0,           // seconds per leg (max)
+  HANDOFF: 0.35,
+  DROP_PAUSE: 0.5,
+  RETURN_DUR: 1.3,
+  PLAYER_DROP_BASE: 0.45,
+  PLAYER_DROP_FACTOR: 0.004,
+  PLAYER_DROP_MIN: 0.05,
+  PARTNER_DROP_BASE: 0.28,
+  PARTNER_DROP_FACTOR: 0.002,
+  PARTNER_DROP_MIN: 0.05,
+  GOLD_EGGS: 5,
+  SILVER_EGGS: 3,
+  FIELD_Z: -56,
+  FIELD_HALF_X: 5,
+  LANE_SPACING: 1.5,
+  SPECTATOR_POS: [-5, 0, -53.5],
+  RETURN_POS: [0, 0, 6],
 }
+```
+
+### Rainy days
+```ts
+RAINY_DAYS = [{ week: 1, day: 2 }, { week: 2, day: 2 }]
+isRainyDay(week, day): boolean   // helper
 ```
 
 ### Relationship
