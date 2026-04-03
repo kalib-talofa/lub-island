@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import { GamePhase, EventType } from '@/characters/CharacterData';
 import { getDaysInWeek, EVENTS_PER_DAY, isRainyDay } from '@/game/constants';
 import { isCeremonyDay, isFreeRoamDay } from '@/systems/calendar';
@@ -37,7 +38,7 @@ interface GameStore {
   resetGame: () => void;
 }
 
-export const useGameStore = create<GameStore>((set) => ({
+export const useGameStore = create<GameStore>()(persist((set) => ({
   phase: 'MAIN_MENU',
   day: 1,
   week: 1,
@@ -121,5 +122,14 @@ export const useGameStore = create<GameStore>((set) => ({
     eventsRemaining: EVENTS_PER_DAY, eventsCompleted: 0,
     isNight: false, isRainy: false, isIndoors: false, indoorLocation: null, arrivedNPCIds: [],
     currentEventType: null,
+  }),
+}), {
+  name: 'lub-game',
+  partialize: (s) => ({
+    phase: s.phase, day: s.day, week: s.week, totalDaysPlayed: s.totalDaysPlayed,
+    eventsRemaining: s.eventsRemaining, eventsCompleted: s.eventsCompleted,
+    isNight: s.isNight, isRainy: s.isRainy, isIndoors: s.isIndoors,
+    indoorLocation: s.indoorLocation, arrivedNPCIds: s.arrivedNPCIds,
+    currentEventType: s.currentEventType,
   }),
 }));

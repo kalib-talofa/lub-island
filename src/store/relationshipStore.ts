@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import { RELATIONSHIP } from '@/game/constants';
 import { STARTING_CAST } from '@/characters/roster';
 
@@ -22,7 +23,7 @@ STARTING_CAST.forEach(c => {
   initialPartners[c.id] = null;
 });
 
-export const useRelationshipStore = create<RelationshipStore>((set, get) => ({
+export const useRelationshipStore = create<RelationshipStore>()(persist((set, get) => ({
   relationships: { ...initialRelationships },
   partners: { ...initialPartners },
   eliminated: [],
@@ -50,5 +51,10 @@ export const useRelationshipStore = create<RelationshipStore>((set, get) => ({
     relationships: { ...initialRelationships },
     partners: { ...initialPartners },
     eliminated: [],
+  }),
+}), {
+  name: 'lub-relationships',
+  partialize: (s) => ({
+    relationships: s.relationships, partners: s.partners, eliminated: s.eliminated,
   }),
 }));

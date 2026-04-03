@@ -29,7 +29,8 @@
       "Skill(update-docs:*)",
       "Bash(/tmp/bug_analysis.txt:*)",
       "Read(//tmp/**)",
-      "Bash(xargs grep:*)"
+      "Bash(xargs grep:*)",
+      "Bash(find /c/Users/kalib/Documents/Supercell/LubIsland/src -type f \\\\\\(-name *.ts -o -name *.tsx \\\\\\))"
     ]
   }
 }

@@ -150,6 +150,18 @@ export default function DevToolbar() {
       });
     });
 
+    // Save data controls
+    const saveFolder = gui.addFolder('💾 Save Data');
+    saveFolder.add({
+      clearSave: () => {
+        localStorage.removeItem('lub-game');
+        localStorage.removeItem('lub-player');
+        localStorage.removeItem('lub-biometrics');
+        localStorage.removeItem('lub-relationships');
+        window.location.reload();
+      },
+    }, 'clearSave').name('🗑️ Clear Save Data & Reload');
+
     // Night drops tracker
     const nightFolder = gui.addFolder('🌙 Night Drops');
     nightFolder.close();

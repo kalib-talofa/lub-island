@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import { ItemDef } from '@/characters/CharacterData';
 
 interface PlayerStore {
@@ -43,7 +44,7 @@ interface PlayerStore {
   resetPlayer: () => void;
 }
 
-export const usePlayerStore = create<PlayerStore>((set, get) => ({
+export const usePlayerStore = create<PlayerStore>()(persist((set, get) => ({
   inventory: [],
   totalChallengesWon: 0,
   totalDatesCompleted: 0,
@@ -123,5 +124,14 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
     performanceBoostToday: 0,
     charmBoostToday: 0,
     unlockedJournals: [],
+  }),
+}), {
+  name: 'lub-player',
+  partialize: (s) => ({
+    inventory: s.inventory, totalChallengesWon: s.totalChallengesWon,
+    totalDatesCompleted: s.totalDatesCompleted, playerSpecies: s.playerSpecies,
+    playerName: s.playerName, playerBio: s.playerBio,
+    performanceBoostToday: s.performanceBoostToday, charmBoostToday: s.charmBoostToday,
+    unlockedJournals: s.unlockedJournals,
   }),
 }));

@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import { BiometricData } from '@/characters/CharacterData';
 import { STAT_FLOOR, BIO_TARGETS } from '@/game/constants';
 
@@ -19,7 +20,7 @@ interface BiometricStore extends BiometricData {
   godMode: boolean;
 }
 
-export const useBiometricStore = create<BiometricStore>((set) => ({
+export const useBiometricStore = create<BiometricStore>()(persist((set) => ({
   sleepHours: 7,
   sleepQuality: 70,
   activeMinutes: 18,
@@ -46,4 +47,17 @@ export const useBiometricStore = create<BiometricStore>((set) => ({
     ? { godMode: true, energy: 100, charm: 100, performance: 100 }
     : { godMode: false, ...computeStats(7, 70, 18, 3000) }
   ),
+}), {
+  name: 'lub-biometrics',
+  partialize: (s) => ({
+    sleepHours: s.sleepHours, sleepQuality: s.sleepQuality,
+    activeMinutes: s.activeMinutes, stepCount: s.stepCount, godMode: s.godMode,
+  }),
+  merge: (persisted, current) => {
+    const merged = { ...current, ...(persisted as Partial<BiometricStore>) };
+    if (merged.godMode) {
+      return { ...merged, energy: 100, charm: 100, performance: 100 };
+    }
+    return { ...merged, ...computeStats(merged.sleepHours, merged.sleepQuality, merged.activeMinutes, merged.stepCount) };
+  },
 }));
